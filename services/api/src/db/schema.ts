@@ -39,10 +39,13 @@ export const pipelineStages = pgTable('pipeline_stages', {
 export const cvSnapshots = pgTable('cv_snapshots', {
 	id: uuid('id').defaultRandom().primaryKey(),
 	label: text('label').notNull(),
+	type: text('type').notNull().default('cv'), // 'cv' | 'cover_letter'
 	latexSource: text('latex_source').notNull(),
 	compiledPdf: text('compiled_pdf'), // base64 encoded, BYTEA in raw SQL
 	notes: text('notes'),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+	deletedAt: timestamp('deleted_at', { withTimezone: true }),
 })
 
 // Offers — central entity

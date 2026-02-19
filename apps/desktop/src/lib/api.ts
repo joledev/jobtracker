@@ -12,6 +12,10 @@ import type {
   Technology,
   TechnologyFilters,
   CvSnapshot,
+  CvSnapshotDetail,
+  CreateCvInput,
+  UpdateCvInput,
+  CvFilters,
   Contact,
   ContactFilters,
   CreateContactInput,
@@ -76,8 +80,8 @@ const createRequest = async <T>(
   })
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ error: response.statusText }))
-    const msg = body.error || response.statusText
+    const body = await response.json().catch(() => null)
+    const msg = body?.error || response.statusText || `HTTP ${response.status}`
     handleApiError(response.status, msg)
   }
 
@@ -101,8 +105,8 @@ const createVoidRequest = async (
   })
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ error: response.statusText }))
-    const msg = body.error || response.statusText
+    const body = await response.json().catch(() => null)
+    const msg = body?.error || response.statusText || `HTTP ${response.status}`
     handleApiError(response.status, msg)
   }
 }
@@ -321,8 +325,29 @@ export const createApiClient = (baseUrl: string, apiKey: string) => ({
   },
 
   cvs: {
-    list: () =>
-      createRequest<CvSnapshot[]>(baseUrl, apiKey, '/api/cvs'),
+    list: (filters?: CvFilters) =>
+      createRequest<CvSnapshot[]>(
+        baseUrl, apiKey,
+        '/api/cvs' + buildQuery({ ...filters } as Record<string, string | number | undefined>),
+      ),
+
+    get: (id: string) =>
+      createRequest<CvSnapshotDetail>(baseUrl, apiKey, `/api/cvs/${id}`),
+
+    create: (data: CreateCvInput) =>
+      createRequest<CvSnapshotDetail>(baseUrl, apiKey, '/api/cvs', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    update: (id: string, data: UpdateCvInput) =>
+      createRequest<CvSnapshotDetail>(baseUrl, apiKey, `/api/cvs/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    delete: (id: string) =>
+      createVoidRequest(baseUrl, apiKey, `/api/cvs/${id}`, { method: 'DELETE' }),
   },
 })
 

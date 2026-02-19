@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { OfferList } from '@/components/offers/OfferList'
 import { OffersFilterBar } from '@/components/offers/OffersFilterBar'
 import { NewOfferModal } from '@/components/offers/NewOfferModal'
+import { ImportOfferModal } from '@/components/offers/ImportOfferModal'
 import { Button } from '@/components/ui/Button'
 import { useOffersStore } from '@/stores/offers'
 import { usePipelineStore } from '@/stores/pipeline'
@@ -30,6 +31,10 @@ export const OffersPage = () => {
   const modalOpen = useUiStore((s) => s.newOfferModalOpen)
   const toggleModal = useUiStore((s) => s.toggleNewOfferModal)
 
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [prefillData, setPrefillData] = useState<Record<string, string> | null>(null)
+  const [prefillTechs, setPrefillTechs] = useState<string[]>([])
+
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
   const title = activeWorkspace ? activeWorkspace.name : 'Ofertas'
 
@@ -39,14 +44,32 @@ export const OffersPage = () => {
     }
   }, [isLoaded, vpsUrl, apiKey, fetchOffers, activeWorkspaceId])
 
+  const handleImport = (formValues: Record<string, string>, technologies: string[]) => {
+    setImportModalOpen(false)
+    setPrefillData(formValues)
+    setPrefillTechs(technologies)
+    toggleModal()
+  }
+
+  const handleNewOfferClose = () => {
+    toggleModal()
+    setPrefillData(null)
+    setPrefillTechs([])
+  }
+
   return (
     <div className="flex h-full flex-col">
       <TopBar
         title={title}
         action={
-          <Button size="sm" onClick={toggleModal}>
-            Nueva Oferta
-          </Button>
+          <>
+            <Button size="sm" variant="ghost" onClick={() => setImportModalOpen(true)}>
+              Importar HTML
+            </Button>
+            <Button size="sm" onClick={toggleModal}>
+              Nueva Oferta
+            </Button>
+          </>
         }
       />
       <OffersFilterBar
@@ -63,7 +86,12 @@ export const OffersPage = () => {
           onCreateClick={toggleModal}
         />
       </div>
-      <NewOfferModal open={modalOpen} onClose={toggleModal} />
+      <NewOfferModal open={modalOpen} onClose={handleNewOfferClose} prefill={prefillData} prefillTechnologies={prefillTechs} />
+      <ImportOfferModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onImport={handleImport}
+      />
     </div>
   )
 }

@@ -5,8 +5,9 @@ import { PipelineSettings } from '@/components/settings/PipelineSettings'
 import { ApiKeysSettings } from '@/components/settings/ApiKeysSettings'
 import { WorkspacesSettings } from '@/components/settings/WorkspacesSettings'
 import { TechnologiesSettings } from '@/components/settings/TechnologiesSettings'
+import { ImportTemplatesSettings } from '@/components/settings/ImportTemplatesSettings'
 
-const tabs = ['Conexion', 'Pipeline', 'API Keys', 'Workspaces', 'Tecnologias'] as const
+const tabs = ['Conexion', 'Pipeline', 'API Keys', 'Workspaces', 'Tecnologias', 'Importacion'] as const
 type SettingsTab = (typeof tabs)[number]
 
 export const SettingsPage = () => {
@@ -38,6 +39,7 @@ export const SettingsPage = () => {
         {activeTab === 'API Keys' && <ApiKeysSettings />}
         {activeTab === 'Workspaces' && <WorkspacesSettings />}
         {activeTab === 'Tecnologias' && <TechnologiesSettings />}
+        {activeTab === 'Importacion' && <ImportTemplatesSettings />}
       </div>
     </div>
   )

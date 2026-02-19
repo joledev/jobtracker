@@ -11,7 +11,7 @@ interface OffersStore {
   fetchOffers: () => Promise<void>
   setFilter: (key: keyof OfferFilters, value: string | number | undefined) => void
   resetFilters: () => void
-  createOffer: (data: CreateOfferInput) => Promise<void>
+  createOffer: (data: CreateOfferInput) => Promise<string>
   updateOffer: (id: string, data: UpdateOfferInput) => Promise<void>
   deleteOffer: (id: string) => Promise<void>
   setActiveWorkspace: (id: string | null) => void
@@ -51,10 +51,11 @@ export const useOffersStore = create<OffersStore>((set, get) => ({
 
   createOffer: async (data) => {
     const { vpsUrl, apiKey } = useConnectionStore.getState()
-    if (!vpsUrl || !apiKey) return
+    if (!vpsUrl || !apiKey) return ''
     const client = createApiClient(vpsUrl, apiKey)
-    await client.offers.create(data)
+    const created = await client.offers.create(data)
     await get().fetchOffers()
+    return created.id
   },
 
   updateOffer: async (id, data) => {

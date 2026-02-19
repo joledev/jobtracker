@@ -1,0 +1,6 @@
+export { extractTextNodes, extractTemplateNodes } from './extract'
+export { buildSelector } from './selector'
+export { autoSuggest } from './suggest'
+export { assignmentsToFormValues } from './convert'
+export type { FieldAssignment, ExtractedNode } from './types'
+export type { TemplateNode } from './extract'

@@ -35,9 +35,32 @@ export interface Technology {
 export interface CvSnapshot {
   id: string
   label: string
+  type: 'cv' | 'cover_letter'
   notes: string | null
   createdAt: string
+  updatedAt: string
   offerCount: number
+}
+
+export interface CvSnapshotDetail extends Omit<CvSnapshot, 'offerCount'> {
+  latexSource: string
+  compiledPdf: string | null
+  offers: { id: string; company: string; position: string; appliedAt: string }[]
+}
+
+export interface CreateCvInput {
+  label: string
+  latexSource: string
+  type?: 'cv' | 'cover_letter'
+  notes?: string
+  compiledPdf?: string
+}
+
+export type UpdateCvInput = Partial<CreateCvInput>
+
+export interface CvFilters {
+  type?: 'cv' | 'cover_letter'
+  search?: string
 }
 
 // Offers — list endpoint (flat stage data)
@@ -296,7 +319,10 @@ export interface CreateTechnologyInput {
   category?: string
 }
 
-export type UpdateTechnologyInput = Partial<CreateTechnologyInput>
+export interface UpdateTechnologyInput {
+  name?: string
+  category?: string | null
+}
 
 // Filters
 

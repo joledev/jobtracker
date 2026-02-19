@@ -138,7 +138,7 @@ export const TechnologiesSettings = () => {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = async (id: string, name: string, category: string) => {
-    await api.technologies.update(id, { name, category: category || undefined })
+    await api.technologies.update(id, { name, category: category || null })
     await load()
   }
 

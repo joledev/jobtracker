@@ -108,6 +108,11 @@ export const createTechnologySchema = z.object({
 	category: z.string().optional(),
 })
 
+export const updateTechnologySchema = z.object({
+	name: z.string().min(1).optional(),
+	category: z.string().nullable().optional(),
+})
+
 export const listTechnologiesQuerySchema = z.object({
 	category: z.string().optional(),
 	search: z.string().optional(),
@@ -138,9 +143,23 @@ export const listQuestionsQuerySchema = z.object({
 
 export const createCvSnapshotSchema = z.object({
 	label: z.string().min(1),
-	latexSource: z.string().min(1),
+	type: z.enum(['cv', 'cover_letter']).default('cv'),
+	latexSource: z.string(),
 	notes: z.string().optional(),
 	compiledPdf: z.string().optional(),
+})
+
+export const updateCvSnapshotSchema = z.object({
+	label: z.string().min(1),
+	type: z.enum(['cv', 'cover_letter']),
+	latexSource: z.string(),
+	notes: z.string().optional(),
+	compiledPdf: z.string().optional(),
+}).partial()
+
+export const listCvsQuerySchema = z.object({
+	type: z.enum(['cv', 'cover_letter']).optional(),
+	search: z.string().optional(),
 })
 
 // --- API Keys ---
@@ -183,5 +202,7 @@ export type CreateQuestionInput = z.infer<typeof createQuestionSchema>
 export type UpdateQuestionInput = z.infer<typeof updateQuestionSchema>
 export type ListQuestionsQuery = z.infer<typeof listQuestionsQuerySchema>
 export type CreateCvSnapshotInput = z.infer<typeof createCvSnapshotSchema>
+export type UpdateCvSnapshotInput = z.infer<typeof updateCvSnapshotSchema>
+export type ListCvsQuery = z.infer<typeof listCvsQuerySchema>
 export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>
 export type TimelineQuery = z.infer<typeof timelineQuerySchema>

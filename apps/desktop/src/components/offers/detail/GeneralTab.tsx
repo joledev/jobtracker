@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import type { OfferDetail } from '@/types/api'
 
 const formatDate = (dateStr: string): string => {
@@ -32,6 +33,8 @@ const Field = ({ label, value }: { label: string; value: string | null | undefin
 )
 
 export const GeneralTab = ({ offer }: GeneralTabProps) => {
+  const navigate = useNavigate()
+
   return (
     <div className="space-y-6 p-4">
       <div className="grid grid-cols-2 gap-x-8 gap-y-4">
@@ -62,7 +65,19 @@ export const GeneralTab = ({ offer }: GeneralTabProps) => {
           </div>
           <Field label="Plataforma" value={offer.sourcePlatform} />
           <Field label="Workspace" value={offer.workspace?.name} />
-          <Field label="CV Enviado" value={offer.cvSnapshot?.label} />
+          <div>
+            <p className="text-xs text-text-muted">CV Enviado</p>
+            {offer.cvSnapshot ? (
+              <button
+                onClick={() => navigate(`/cv?selected=${offer.cvSnapshot!.id}`)}
+                className="text-sm text-status-applied hover:underline"
+              >
+                {offer.cvSnapshot.label}
+              </button>
+            ) : (
+              <p className="text-sm text-text-primary">No especificado</p>
+            )}
+          </div>
         </div>
       </div>
 

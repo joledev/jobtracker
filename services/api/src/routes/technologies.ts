@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, isNull } from 'drizzle-orm'
+import { and, asc, eq, ilike, isNull, ne } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { db } from '../db'
 import { offers, offerTechnologies, technologies } from '../db/schema'
@@ -6,6 +6,7 @@ import {
 	createTechnologySchema,
 	linkOfferTechnologySchema,
 	listTechnologiesQuerySchema,
+	updateTechnologySchema,
 	uuidParam,
 } from './schemas'
 
@@ -50,6 +51,60 @@ technologiesRoute.post('/', async (c) => {
 
 	const [tech] = await db.insert(technologies).values(result.data).returning()
 	return c.json(tech, 201)
+})
+
+technologiesRoute.put('/:id', async (c) => {
+	const paramResult = uuidParam.safeParse({ id: c.req.param('id') })
+	if (!paramResult.success) {
+		return c.json({ error: 'Invalid UUID' }, 400)
+	}
+	const { id } = paramResult.data
+
+	const body = await c.req.json()
+	const result = updateTechnologySchema.safeParse(body)
+	if (!result.success) {
+		return c.json({ error: 'Validation failed', issues: result.error.flatten() }, 400)
+	}
+
+	if (result.data.name) {
+		const [dup] = await db
+			.select({ id: technologies.id })
+			.from(technologies)
+			.where(and(eq(technologies.name, result.data.name), ne(technologies.id, id)))
+			.limit(1)
+		if (dup) {
+			return c.json({ error: 'Technology with this name already exists' }, 409)
+		}
+	}
+
+	const [updated] = await db
+		.update(technologies)
+		.set(result.data)
+		.where(eq(technologies.id, id))
+		.returning()
+	if (!updated) {
+		return c.json({ error: 'Technology not found' }, 404)
+	}
+
+	return c.json(updated)
+})
+
+technologiesRoute.delete('/:id', async (c) => {
+	const paramResult = uuidParam.safeParse({ id: c.req.param('id') })
+	if (!paramResult.success) {
+		return c.json({ error: 'Invalid UUID' }, 400)
+	}
+	const { id } = paramResult.data
+
+	const [deleted] = await db
+		.delete(technologies)
+		.where(eq(technologies.id, id))
+		.returning({ id: technologies.id })
+	if (!deleted) {
+		return c.json({ error: 'Technology not found' }, 404)
+	}
+
+	return c.json({ success: true })
 })
 
 // Offer-scoped technology routes
