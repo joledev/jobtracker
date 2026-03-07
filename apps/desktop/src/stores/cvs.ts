@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
-import { createApiClient } from '@/lib/api'
-import { useConnectionStore } from '@/stores/connection'
+import { getClient } from '@/lib/client'
 import type { CvSnapshot, CvSnapshotDetail, CreateCvInput, UpdateCvInput } from '@/types/api'
 
 interface CvsStore {
@@ -23,12 +22,6 @@ interface CvsStore {
   checkLatex: () => Promise<void>
   compileLatex: (source: string) => Promise<string>
   savePdfToDisk: (base64: string, filename: string) => Promise<void>
-}
-
-const getClient = () => {
-  const { vpsUrl, apiKey } = useConnectionStore.getState()
-  if (!vpsUrl || !apiKey) return null
-  return createApiClient(vpsUrl, apiKey)
 }
 
 export const useCvsStore = create<CvsStore>((set, get) => ({

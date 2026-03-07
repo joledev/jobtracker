@@ -1,6 +1,5 @@
 import { create } from 'zustand'
-import { createApiClient } from '@/lib/api'
-import { useConnectionStore } from '@/stores/connection'
+import { getClient } from '@/lib/client'
 import type { PipelineStage, Workspace } from '@/types/api'
 
 interface PipelineStore {
@@ -17,11 +16,10 @@ export const usePipelineStore = create<PipelineStore>((set) => ({
   isLoading: false,
 
   fetchStages: async () => {
-    const { vpsUrl, apiKey } = useConnectionStore.getState()
-    if (!vpsUrl || !apiKey) return
+    const client = getClient()
+    if (!client) return
     set({ isLoading: true })
     try {
-      const client = createApiClient(vpsUrl, apiKey)
       const stages = await client.pipeline.list()
       set({ stages })
     } finally {
@@ -30,10 +28,9 @@ export const usePipelineStore = create<PipelineStore>((set) => ({
   },
 
   fetchWorkspaces: async () => {
-    const { vpsUrl, apiKey } = useConnectionStore.getState()
-    if (!vpsUrl || !apiKey) return
+    const client = getClient()
+    if (!client) return
     try {
-      const client = createApiClient(vpsUrl, apiKey)
       const workspaces = await client.workspaces.list()
       set({ workspaces })
     } catch {

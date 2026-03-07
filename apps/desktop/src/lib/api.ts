@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useConnectionStore } from '@/stores/connection'
+import { createLocalClient } from './local-db'
 import type {
   OfferListItem,
   OfferDetail,
@@ -354,8 +355,12 @@ export const createApiClient = (baseUrl: string, apiKey: string) => ({
 export type ApiClient = ReturnType<typeof createApiClient>
 
 export const useApi = () => {
-  const { vpsUrl, apiKey } = useConnectionStore()
-  return useMemo(() => createApiClient(vpsUrl, apiKey), [vpsUrl, apiKey])
+  const { storageMode, vpsUrl, apiKey } = useConnectionStore()
+
+  return useMemo(() => {
+    if (storageMode === 'local') return createLocalClient()
+    return createApiClient(vpsUrl, apiKey)
+  }, [storageMode, vpsUrl, apiKey])
 }
 
 export const testConnection = async (

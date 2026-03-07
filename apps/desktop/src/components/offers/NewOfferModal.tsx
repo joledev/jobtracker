@@ -9,8 +9,7 @@ import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { useOffersStore } from '@/stores/offers'
 import { usePipelineStore } from '@/stores/pipeline'
-import { createApiClient } from '@/lib/api'
-import { useConnectionStore } from '@/stores/connection'
+import { getClient } from '@/lib/client'
 import type { CreateOfferInput, OfferDetail, CvSnapshot } from '@/types/api'
 
 const formSchema = z.object({
@@ -126,9 +125,8 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
     if (!name) return
     setIsCreatingWs(true)
     try {
-      const { vpsUrl, apiKey } = useConnectionStore.getState()
-      if (!vpsUrl || !apiKey) return
-      const client = createApiClient(vpsUrl, apiKey)
+      const client = getClient()
+      if (!client) return
       const created = await client.workspaces.create({ name })
       await fetchWorkspaces()
       setValue('workspaceId', created.id)
@@ -141,9 +139,9 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
 
   useEffect(() => {
     if (open) {
-      const { vpsUrl, apiKey } = useConnectionStore.getState()
-      if (vpsUrl && apiKey) {
-        createApiClient(vpsUrl, apiKey).cvs.list({ type: 'cv' }).then(setCvOptions).catch(() => {})
+      const client = getClient()
+      if (client) {
+        client.cvs.list({ type: 'cv' }).then(setCvOptions).catch(() => {})
       }
     }
   }, [open])
@@ -245,9 +243,8 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
         const offerId = await createOffer(input)
         if (offerId && technologies.length > 0) {
           try {
-            const { vpsUrl, apiKey } = useConnectionStore.getState()
-            if (vpsUrl && apiKey) {
-              const client = createApiClient(vpsUrl, apiKey)
+            const client = getClient()
+            if (client) {
               const allTechs = await client.technologies.list()
               for (const techName of technologies) {
                 let tech = allTechs.find(t => t.name.toLowerCase() === techName.toLowerCase())

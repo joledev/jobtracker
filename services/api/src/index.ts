@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
+import { secureHeaders } from 'hono/secure-headers'
 import { authMiddleware } from './middleware/auth'
 import { apikeysRoute } from './routes/apikeys'
 import { callsRoute } from './routes/calls'
@@ -18,6 +19,12 @@ const app = new Hono()
 
 app.use('*', logger())
 app.use('*', cors())
+app.use('*', secureHeaders())
+
+app.onError((err, c) => {
+	console.error(`[${c.req.method}] ${c.req.path}:`, err)
+	return c.json({ error: 'Internal Server Error' }, 500)
+})
 
 // Public routes (no auth required)
 app.route('/', healthRoute)

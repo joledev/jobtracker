@@ -1,10 +1,14 @@
 import { create } from 'zustand'
 import { load } from '@tauri-apps/plugin-store'
 
+export type StorageMode = 'local' | 'remote'
+
 interface ConnectionStore {
+  storageMode: StorageMode
   vpsUrl: string
   apiKey: string
   isLoaded: boolean
+  setStorageMode: (mode: StorageMode) => Promise<void>
   setVpsUrl: (url: string) => Promise<void>
   setApiKey: (key: string) => Promise<void>
   loadFromStore: () => Promise<void>
@@ -13,9 +17,17 @@ interface ConnectionStore {
 const STORE_NAME = 'settings.json'
 
 export const useConnectionStore = create<ConnectionStore>((set) => ({
+  storageMode: 'local',
   vpsUrl: '',
   apiKey: '',
   isLoaded: false,
+
+  setStorageMode: async (mode: StorageMode) => {
+    const store = await load(STORE_NAME)
+    await store.set('storage_mode', mode)
+    await store.save()
+    set({ storageMode: mode })
+  },
 
   setVpsUrl: async (url: string) => {
     const store = await load(STORE_NAME)
@@ -34,9 +46,10 @@ export const useConnectionStore = create<ConnectionStore>((set) => ({
   loadFromStore: async () => {
     try {
       const store = await load(STORE_NAME)
+      const storageMode = ((await store.get('storage_mode')) as StorageMode) || 'local'
       const vpsUrl = ((await store.get('vps_url')) as string) || ''
       const apiKey = ((await store.get('api_key')) as string) || ''
-      set({ vpsUrl, apiKey, isLoaded: true })
+      set({ storageMode, vpsUrl, apiKey, isLoaded: true })
     } catch {
       set({ isLoaded: true })
     }

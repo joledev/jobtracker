@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { useTemplatesStore } from '@/stores/templates'
 import { extractTextNodes, autoSuggest, assignmentsToFormValues } from '@/lib/html-extractor'
 import { htmlToText, extractTechnologies } from '@/lib/parsers/utils'
-import { createApiClient } from '@/lib/api'
-import { useConnectionStore } from '@/stores/connection'
+import { getClient } from '@/lib/client'
 import type { ExtractedNode, FieldAssignment } from '@/lib/html-extractor'
 
 interface ImportOfferModalProps {
@@ -66,9 +65,8 @@ export const ImportOfferModal = ({ open, onClose, onImport }: ImportOfferModalPr
       const fullText = htmlToText(html)
       let customKeywords: string[] | undefined
       try {
-        const { vpsUrl, apiKey } = useConnectionStore.getState()
-        if (vpsUrl && apiKey) {
-          const client = createApiClient(vpsUrl, apiKey)
+        const client = getClient()
+        if (client) {
           const apiTechs = await client.technologies.list()
           customKeywords = apiTechs.map(t => t.name)
         }

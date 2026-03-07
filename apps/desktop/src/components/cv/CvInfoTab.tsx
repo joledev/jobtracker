@@ -27,6 +27,7 @@ export const CvInfoTab = ({ cv }: CvInfoTabProps) => {
   }
 
   const handleDelete = async () => {
+    if (!confirm('¿Eliminar este documento? Esta accion no se puede deshacer.')) return
     await deleteCv(cv.id)
   }
 

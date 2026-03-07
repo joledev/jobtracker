@@ -37,6 +37,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
 		.set({ lastUsedAt: new Date() })
 		.where(eq(apiKeys.keyHash, keyHash))
 		.then(() => {})
+		.catch((err) => console.error('Failed to update lastUsedAt:', err))
 
 	await next()
 })

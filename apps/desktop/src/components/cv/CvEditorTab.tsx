@@ -1,8 +1,7 @@
 import { useEffect, useCallback, useRef, useState } from 'react'
 import Editor from '@monaco-editor/react'
 import { Button } from '@/components/ui/Button'
-import { createApiClient } from '@/lib/api'
-import { useConnectionStore } from '@/stores/connection'
+import { getClient } from '@/lib/client'
 import { useCvsStore } from '@/stores/cvs'
 import type { CvSnapshotDetail } from '@/types/api'
 
@@ -39,9 +38,9 @@ export const CvEditorTab = ({ cv }: CvEditorTabProps) => {
       if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
       const currentSource = sourceRef.current
       if (currentSource !== lastSavedRef.current) {
-        const { vpsUrl, apiKey } = useConnectionStore.getState()
-        if (vpsUrl && apiKey) {
-          createApiClient(vpsUrl, apiKey).cvs.update(id, { latexSource: currentSource }).catch(() => {})
+        const client = getClient()
+        if (client) {
+          client.cvs.update(id, { latexSource: currentSource }).catch(() => {})
         }
       }
     }

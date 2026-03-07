@@ -10,6 +10,7 @@
     "store:default",
     "dialog:default",
     "shell:default",
-    "fs:default"
+    "fs:default",
+    "sql:default"
   ]
 }

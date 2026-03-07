@@ -19,6 +19,10 @@ export const OffersFilterBar = ({ filters, stages, onChange, onReset }: OffersFi
     setSearchInput(filters.search || '')
   }, [filters.search])
 
+  useEffect(() => {
+    return () => clearTimeout(debounceRef.current)
+  }, [])
+
   const handleSearch = (value: string) => {
     setSearchInput(value)
     clearTimeout(debounceRef.current)
