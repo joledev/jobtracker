@@ -24,6 +24,7 @@ import type {
   CreateQuestionInput,
   UpdateQuestionInput,
   AddTechnologyInput,
+  StatusLogEntry,
   TimelineResponse,
   TimelineFilters,
   CreateStageInput,
@@ -500,7 +501,7 @@ export function createLocalClient(): ApiClient {
         return { id, offerId, question: data.question, myAnswer: data.myAnswer ?? null, difficulty: data.difficulty ?? null, category: data.category ?? null, askedAt: data.askedAt ?? null, createdAt: ts, updatedAt: ts } as InterviewQuestion
       },
 
-      updateQuestion: async (offerId: string, qId: string, data: UpdateQuestionInput) => {
+      updateQuestion: async (_offerId: string, qId: string, data: UpdateQuestionInput) => {
         const d = getDb()
         const sets: string[] = []
         const params: unknown[] = []
@@ -547,7 +548,7 @@ export function createLocalClient(): ApiClient {
            FROM offers o LEFT JOIN pipeline_stages ps ON o.current_stage_id = ps.id
            WHERE o.id = $1`, [offerId],
         )
-        const events = offerRows.map((r) => ({
+        const events: StatusLogEntry[] = offerRows.map((r) => ({
           type: 'offer_created' as const,
           timestamp: r.created_at as string,
           offerId: r.id as string,

@@ -22,11 +22,11 @@ export const buildSelector = (el: Element, root: Element): string => {
 
   while (current && current !== root) {
     const tag = current.tagName.toLowerCase()
-    const parent = current.parentElement
-    if (!parent) break
+    const parentEl: Element | null = current.parentElement
+    if (!parentEl) break
 
-    const siblings = Array.from(parent.children).filter(
-      (s) => s.tagName.toLowerCase() === tag,
+    const siblings = Array.from(parentEl.children).filter(
+      (s: Element) => s.tagName.toLowerCase() === tag,
     )
 
     if (siblings.length === 1) {
@@ -36,7 +36,7 @@ export const buildSelector = (el: Element, root: Element): string => {
       path.unshift(`${tag}:nth-of-type(${index})`)
     }
 
-    current = parent
+    current = parentEl
   }
 
   const selector = path.join(' > ')
