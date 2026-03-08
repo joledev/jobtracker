@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: jobtracker
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jobtracker_pass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: jobtracker
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -23,7 +23,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://jobtracker:${POSTGRES_PASSWORD:-jobtracker_pass}@postgres:5432/jobtracker
+      DATABASE_URL: postgresql://jobtracker:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/jobtracker
       PORT: 3000
     ports:
       - "127.0.0.1:3000:3000"

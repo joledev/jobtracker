@@ -1,6 +1,7 @@
 import { and, desc, eq, ilike, isNull, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { db } from '../db'
+import { escapeLike } from '../utils'
 import { cvSnapshots, offers } from '../db/schema'
 import { createCvSnapshotSchema, listCvsQuerySchema, updateCvSnapshotSchema, uuidParam } from './schemas'
 
@@ -15,7 +16,7 @@ cvsRoute.get('/', async (c) => {
 
 	const conditions = [isNull(cvSnapshots.deletedAt)]
 	if (type) conditions.push(eq(cvSnapshots.type, type))
-	if (search) conditions.push(ilike(cvSnapshots.label, `%${search}%`))
+	if (search) conditions.push(ilike(cvSnapshots.label, `%${escapeLike(search)}%`))
 
 	const rows = await db
 		.select({

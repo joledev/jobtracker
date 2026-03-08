@@ -32,5 +32,10 @@ Thumbs.db
 # Local config (Tauri plugin-store)
 *.local
 
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
 # Claude Code internal
 .claude/

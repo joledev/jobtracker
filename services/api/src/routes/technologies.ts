@@ -1,6 +1,7 @@
 import { and, asc, eq, ilike, isNull, ne } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { db } from '../db'
+import { escapeLike } from '../utils'
 import { offers, offerTechnologies, technologies } from '../db/schema'
 import {
 	createTechnologySchema,
@@ -25,7 +26,7 @@ technologiesRoute.get('/', async (c) => {
 		.where(
 			and(
 				category ? eq(technologies.category, category) : undefined,
-				search ? ilike(technologies.name, `%${search}%`) : undefined,
+				search ? ilike(technologies.name, `%${escapeLike(search)}%`) : undefined,
 			),
 		)
 		.orderBy(asc(technologies.name))

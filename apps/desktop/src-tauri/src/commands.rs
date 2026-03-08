@@ -21,6 +21,7 @@ pub fn compile_latex(latex_source: String) -> Result<String, String> {
 
     let output = Command::new("pdflatex")
         .args([
+            "--no-shell-escape",
             "-interaction=nonstopmode",
             "-halt-on-error",
             "-output-directory",

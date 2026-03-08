@@ -328,4 +328,4 @@ git push origin v1.0.0
 
 ## License
 
-Private project. All rights reserved.
+MIT License. See [LICENSE](LICENSE) for details.

@@ -18,7 +18,9 @@ import { workspacesRoute } from './routes/workspaces'
 const app = new Hono()
 
 app.use('*', logger())
-app.use('*', cors())
+app.use('*', cors({
+	origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+}))
 app.use('*', secureHeaders())
 
 app.onError((err, c) => {
