@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { secureHeaders } from 'hono/secure-headers'
 import { authMiddleware } from './middleware/auth'
+import { rateLimit } from './middleware/rate-limit'
 import { apikeysRoute } from './routes/apikeys'
 import { callsRoute } from './routes/calls'
 import { contactsRoute, offerContactsRoute } from './routes/contacts'
@@ -35,7 +36,10 @@ app.onError((err, c) => {
 // Public routes (no auth required)
 app.route('/', healthRoute)
 
-// Protected routes
+// Protected routes. The rate limiter runs BEFORE auth on purpose: placed after,
+// every unauthenticated request would already have hit the database looking up
+// the key hash, which is the exhaustion path being closed here.
+app.use('/api/*', rateLimit)
 app.use('/api/*', authMiddleware)
 
 app.route('/api/offers', offersRoute)
