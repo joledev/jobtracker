@@ -1,0 +1,10 @@
+# El proyecto se desarrolla en Windows y Linux. Sin esto, el repositorio acumula
+# archivos con CRLF y otros con LF, y cualquier diff se vuelve ilegible: una
+# comparacion entre el clon y el arbol de trabajo marcaba 51 archivos como
+# distintos cuando solo cambiaban los finales de linea.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
+*.lockb binary
