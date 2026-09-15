@@ -9,13 +9,11 @@ import { Button } from '@/components/ui/Button'
 import { useOffersStore } from '@/stores/offers'
 import { usePipelineStore } from '@/stores/pipeline'
 import { useUiStore } from '@/stores/ui'
-import { useConnectionStore } from '@/stores/connection'
+import { useDataReady } from '@/stores/connection'
 
 export const OffersPage = () => {
   const navigate = useNavigate()
-  const isLoaded = useConnectionStore((s) => s.isLoaded)
-  const vpsUrl = useConnectionStore((s) => s.vpsUrl)
-  const apiKey = useConnectionStore((s) => s.apiKey)
+  const dataReady = useDataReady()
 
   const items = useOffersStore((s) => s.items)
   const isLoading = useOffersStore((s) => s.isLoading)
@@ -39,10 +37,10 @@ export const OffersPage = () => {
   const title = activeWorkspace ? activeWorkspace.name : 'Ofertas'
 
   useEffect(() => {
-    if (isLoaded && vpsUrl && apiKey) {
+    if (dataReady) {
       fetchOffers()
     }
-  }, [isLoaded, vpsUrl, apiKey, fetchOffers, activeWorkspaceId])
+  }, [dataReady, fetchOffers, activeWorkspaceId])
 
   const handleImport = (formValues: Record<string, string>, technologies: string[]) => {
     setImportModalOpen(false)

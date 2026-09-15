@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
 import { OffersPage } from '@/pages/OffersPage'
@@ -21,9 +21,10 @@ const App = () => {
   const apiKey = useConnectionStore((s) => s.apiKey)
   const fetchStages = usePipelineStore((s) => s.fetchStages)
   const fetchWorkspaces = usePipelineStore((s) => s.fetchWorkspaces)
-  const [dbReady, setDbReady] = useState(false)
 
   const loadDropdownOptions = useDropdownOptionsStore((s) => s.loadOptions)
+  const dbReady = useConnectionStore((s) => s.dbReady)
+  const setDbReady = useConnectionStore((s) => s.setDbReady)
 
   useEffect(() => {
     loadFromStore()
@@ -42,7 +43,7 @@ const App = () => {
 
   useEffect(() => {
     if (!dbReady) return
-    const ready = storageMode === 'local' || (vpsUrl && apiKey)
+    const ready = storageMode === 'local' || !!(vpsUrl && apiKey)
     if (ready) {
       fetchStages()
       fetchWorkspaces()
