@@ -435,16 +435,34 @@ export function createLocalClient(): ApiClient {
 
       changeStatus: async (id: string, data: ChangeStatusInput) => {
         const d = getDb()
-        const rows = await d.select<[{ current_stage_id: string | null }]>(
-          'SELECT current_stage_id FROM offers WHERE id = $1', [id],
+        const rows = await d.select<{ current_stage_id: string | null }[]>(
+          'SELECT current_stage_id FROM offers WHERE id = $1 AND deleted_at IS NULL', [id],
         )
+        // El servidor devuelve 404 si la oferta no existe. Antes, aqui una oferta
+        // inexistente producia un UPDATE que no afectaba a nada y una entrada de
+        // historial huerfana, devolviendo success: true.
+        if (rows.length === 0) throw new Error('Offer not found')
+
         const fromStageId = rows[0]?.current_stage_id ?? null
         const ts = now()
-        await d.execute('UPDATE offers SET current_stage_id = $1, updated_at = $2 WHERE id = $3', [data.stageId, ts, id])
-        await d.execute(
-          'INSERT INTO offer_status_log (id, offer_id, from_stage_id, to_stage_id, note, changed_at) VALUES ($1,$2,$3,$4,$5,$6)',
-          [uuid(), id, fromStageId, data.stageId, data.note ?? null, ts],
-        )
+
+        // Las dos escrituras van en una transaccion, como en
+        // services/api/src/routes/offers.ts. Sin ella, un corte entre ambas
+        // dejaba la etapa cambiada y el historial perdido en silencio: en un
+        // gestor de busqueda de empleo, esa es la peor perdida posible.
+        await d.execute('BEGIN')
+        try {
+          await d.execute('UPDATE offers SET current_stage_id = $1, updated_at = $2 WHERE id = $3', [data.stageId, ts, id])
+          await d.execute(
+            'INSERT INTO offer_status_log (id, offer_id, from_stage_id, to_stage_id, note, changed_at) VALUES ($1,$2,$3,$4,$5,$6)',
+            [uuid(), id, fromStageId, data.stageId, data.note ?? null, ts],
+          )
+          await d.execute('COMMIT')
+        } catch (e) {
+          await d.execute('ROLLBACK').catch(() => {})
+          throw e
+        }
+
         return { success: true, fromStageId: fromStageId ?? null, toStageId: data.stageId }
       },
 
@@ -900,8 +918,53 @@ export function createLocalClient(): ApiClient {
         } as Workspace
       },
 
-      delete: async (id: string) => {
-        await getDb().execute('UPDATE workspaces SET deleted_at = $1 WHERE id = $2', [now(), id])
+      // Replica la semantica del servidor (services/api/src/routes/workspaces.ts).
+      // Antes ignoraba `opts` y solo marcaba el workspace como borrado, dejando
+      // sus ofertas apuntando a un workspace inexistente: no era solo una firma
+      // incompatible, era una divergencia de comportamiento entre los dos modos.
+      delete: async (
+        id: string,
+        opts?: { action?: 'delete_offers' | 'move_offers'; targetWorkspaceId?: string },
+      ): Promise<{ success: boolean; offersAffected: number }> => {
+        const d = getDb()
+
+        const conteo = await d.select<{ total: number }[]>(
+          'SELECT COUNT(*) AS total FROM offers WHERE workspace_id = $1 AND deleted_at IS NULL',
+          [id],
+        )
+        const total = conteo[0]?.total ?? 0
+
+        // Con ofertas dentro, borrar sin decir que hacer con ellas seria una
+        // perdida silenciosa. El servidor responde 400; aqui se lanza.
+        if (total > 0 && !opts?.action) {
+          throw new Error('Workspace has offers: choose delete_offers or move_offers')
+        }
+
+        if (opts?.action === 'move_offers') {
+          if (!opts.targetWorkspaceId) {
+            throw new Error('targetWorkspaceId is required when moving offers')
+          }
+          const destino = await d.select<{ id: string }[]>(
+            'SELECT id FROM workspaces WHERE id = $1 AND deleted_at IS NULL',
+            [opts.targetWorkspaceId],
+          )
+          if (destino.length === 0) throw new Error('Target workspace not found')
+
+          await d.execute(
+            'UPDATE offers SET workspace_id = $1, updated_at = $2 WHERE workspace_id = $3 AND deleted_at IS NULL',
+            [opts.targetWorkspaceId, now(), id],
+          )
+        }
+
+        if (opts?.action === 'delete_offers') {
+          await d.execute(
+            'UPDATE offers SET deleted_at = $1 WHERE workspace_id = $2 AND deleted_at IS NULL',
+            [now(), id],
+          )
+        }
+
+        await d.execute('UPDATE workspaces SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL', [now(), id])
+        return { success: true, offersAffected: total }
       },
     },
 
