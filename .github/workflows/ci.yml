@@ -1,0 +1,134 @@
+# Integracion continua en push y pull request.
+#
+# Hasta ahora el unico workflow del repositorio se disparaba con tags y solo
+# compilaba los binarios: ni lint, ni tests, ni la API. Por eso un build roto
+# con cinco errores de TypeScript convivio con una release publicada sin que
+# nada lo señalara.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Un push que llega mientras corre el anterior cancela al viejo: nadie necesita
+# el resultado de un commit ya superado.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Desktop (lint, tests, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `continue-on-error` a proposito: hay un error preexistente de
+      # react-hooks/set-state-in-effect en OffersFilterBar. Sin esto el CI nace
+      # en rojo y se aprende a ignorarlo, que es peor que no tenerlo. Quitar
+      # esta linea en cuanto ese error se corrija.
+      - name: Lint
+        run: pnpm lint
+        continue-on-error: true
+
+      - name: Tests
+        run: pnpm test:run
+
+      # Compila `tsc -b && vite build`, que es exactamente lo que ejecuta
+      # `beforeBuildCommand` de Tauri: si esto falla, la release tambien.
+      - name: Build
+        run: pnpm build
+
+  api:
+    name: API (check, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Biome check
+        run: bun run check
+
+      - name: Build
+        run: bun run build
+
+  # Verifica que el camino documentado en el README funciona de verdad: clonar,
+  # levantar el compose, aplicar TODAS las migraciones y responder. Es el paso
+  # que habria detectado que el quick start aplicaba solo la migracion 0000.
+  self-hosting:
+    name: Self-hosting quick start
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env from example
+        run: |
+          cp .env.example .env
+          sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci_test_password/" .env
+          sed -i "s|YOUR_SECURE_PASSWORD|ci_test_password|g" .env
+          echo "MASTER_API_KEY=$(openssl rand -hex 32)" >> .env
+
+      - name: Start services
+        run: docker compose up -d --build
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/health > /dev/null; then
+              echo "API is up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "API never became healthy" >&2
+          docker compose logs --tail=50
+          exit 1
+
+      - name: Apply migrations
+        run: docker compose exec -T api bun run db:migrate
+
+      # Sin la migracion 0001 este endpoint devuelve error: las rutas de CVs
+      # consultan columnas que solo esa migracion crea.
+      - name: CV routes answer (regression guard for migration 0001)
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "X-API-Key: $(grep '^MASTER_API_KEY=' .env | cut -d= -f2)" \
+            http://localhost:3000/api/cvs)
+          echo "GET /api/cvs -> $code"
+          [ "$code" = "200" ] || { docker compose logs --tail=50 api; exit 1; }
+
+      - name: Stop services
+        if: always()
+        run: docker compose down -v
