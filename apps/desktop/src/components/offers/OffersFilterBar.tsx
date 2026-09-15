@@ -13,11 +13,16 @@ interface OffersFilterBarProps {
 
 export const OffersFilterBar = ({ filters, stages, onChange, onReset }: OffersFilterBarProps) => {
   const [searchInput, setSearchInput] = useState(filters.search || '')
+  const [prevSearch, setPrevSearch] = useState(filters.search)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
-  useEffect(() => {
+  // Ajustar estado cuando cambia una prop se hace durante el render, no en un
+  // efecto: asi React reprocesa antes de pintar, sin el render en cascada que
+  // provocaba el `setSearchInput` dentro de `useEffect`.
+  if (filters.search !== prevSearch) {
+    setPrevSearch(filters.search)
     setSearchInput(filters.search || '')
-  }, [filters.search])
+  }
 
   useEffect(() => {
     return () => clearTimeout(debounceRef.current)

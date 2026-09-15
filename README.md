@@ -156,9 +156,9 @@ cp .env.example .env
 
 docker compose up -d
 
-# Apply migrations
-cat drizzle/0000_third_gravity.sql | \
-  docker compose exec -T postgres psql -U jobtracker -d jobtracker
+# Apply migrations (all of them -- applying only 0000 leaves the CV
+# manager broken, because 0001 adds columns its routes query)
+docker compose exec api bun run db:migrate
 
 # Seed default data
 docker compose exec api bun run dist/db/seed.js

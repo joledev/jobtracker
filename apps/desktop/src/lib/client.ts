@@ -18,9 +18,3 @@ export function getClient(): ApiClient | null {
   if (!vpsUrl || !apiKey) return null
   return createApiClient(vpsUrl, apiKey)
 }
-
-export function isConfigured(): boolean {
-  const { storageMode, vpsUrl, apiKey } = useConnectionStore.getState()
-  if (storageMode === 'local') return true
-  return !!(vpsUrl && apiKey)
-}

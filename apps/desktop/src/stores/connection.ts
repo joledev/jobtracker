@@ -8,6 +8,9 @@ interface ConnectionStore {
   vpsUrl: string
   apiKey: string
   isLoaded: boolean
+  /** La base local ya esta inicializada. En modo remoto se marca de inmediato. */
+  dbReady: boolean
+  setDbReady: (ready: boolean) => void
   setStorageMode: (mode: StorageMode) => Promise<void>
   setVpsUrl: (url: string) => Promise<void>
   setApiKey: (key: string) => Promise<void>
@@ -21,6 +24,9 @@ export const useConnectionStore = create<ConnectionStore>((set) => ({
   vpsUrl: '',
   apiKey: '',
   isLoaded: false,
+  dbReady: false,
+
+  setDbReady: (ready: boolean) => set({ dbReady: ready }),
 
   setStorageMode: async (mode: StorageMode) => {
     const store = await load(STORE_NAME)
@@ -55,3 +61,12 @@ export const useConnectionStore = create<ConnectionStore>((set) => ({
     }
   },
 }))
+
+/** Unica fuente de verdad para "ya se pueden pedir datos". */
+export const useDataReady = (): boolean =>
+  useConnectionStore(
+    (s) =>
+      s.isLoaded &&
+      s.dbReady &&
+      (s.storageMode === 'local' || !!(s.vpsUrl && s.apiKey)),
+  )

@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { useOffersStore } from '@/stores/offers'
 import { usePipelineStore } from '@/stores/pipeline'
+import { useDropdownOptionsStore } from '@/stores/dropdown-options'
 import { getClient } from '@/lib/client'
 import type { CreateOfferInput, OfferDetail, CvSnapshot } from '@/types/api'
 
@@ -32,51 +33,6 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>
 
-const levelOptions = [
-  { value: 'junior', label: 'Junior' },
-  { value: 'mid', label: 'Mid' },
-  { value: 'senior', label: 'Senior' },
-  { value: 'staff', label: 'Staff' },
-  { value: 'architect', label: 'Architect' },
-]
-
-const typeOptions = [
-  { value: 'full-time', label: 'Full-time' },
-  { value: 'contract', label: 'Contract' },
-  { value: 'freelance', label: 'Freelance' },
-  { value: 'part-time', label: 'Part-time' },
-]
-
-const modalityOptions = [
-  { value: 'remote', label: 'Remote' },
-  { value: 'hybrid', label: 'Hybrid' },
-  { value: 'onsite', label: 'On-site' },
-]
-
-const currencyOptions = [
-  { value: 'USD', label: 'USD' },
-  { value: 'EUR', label: 'EUR' },
-  { value: 'GBP', label: 'GBP' },
-  { value: 'ARS', label: 'ARS' },
-  { value: 'MXN', label: 'MXN' },
-]
-
-const periodOptions = [
-  { value: 'monthly', label: 'Mensual' },
-  { value: 'annual', label: 'Anual' },
-  { value: 'hourly', label: 'Por hora' },
-]
-
-const platformOptions = [
-  { value: 'LinkedIn', label: 'LinkedIn' },
-  { value: 'Indeed', label: 'Indeed' },
-  { value: 'OCC', label: 'OCC' },
-  { value: 'Computrabajo', label: 'Computrabajo' },
-  { value: 'referral', label: 'Referido' },
-  { value: 'company-site', label: 'Web empresa' },
-  { value: 'other', label: 'Otro' },
-]
-
 interface NewOfferModalProps {
   open: boolean
   onClose: () => void
@@ -93,12 +49,15 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
   const [newWorkspaceName, setNewWorkspaceName] = useState('')
   const [isCreatingWs, setIsCreatingWs] = useState(false)
   const [technologies, setTechnologies] = useState<string[]>([])
+  const [techInput, setTechInput] = useState('')
   const createOffer = useOffersStore((s) => s.createOffer)
   const updateOffer = useOffersStore((s) => s.updateOffer)
   const activeWorkspaceId = useOffersStore((s) => s.activeWorkspaceId)
   const stages = usePipelineStore((s) => s.stages)
   const workspaces = usePipelineStore((s) => s.workspaces)
   const fetchWorkspaces = usePipelineStore((s) => s.fetchWorkspaces)
+  const dropdownOptions = useDropdownOptionsStore((s) => s.options)
+  const addOption = useDropdownOptionsStore((s) => s.addOption)
 
   const isEditMode = !!offer
 
@@ -118,7 +77,20 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
     },
   })
 
-  const currentWorkspaceId = watch('workspaceId')
+  const watchedValues = watch()
+
+  const setField = (name: keyof FormData) => (e: { target: { value: string } }) => {
+    setValue(name, e.target.value)
+  }
+
+  const addTech = () => {
+    const items = techInput.split(',').map(s => s.trim()).filter(Boolean)
+    const unique = items.filter(t => !technologies.some(e => e.toLowerCase() === t.toLowerCase()))
+    if (unique.length > 0) {
+      setTechnologies(prev => [...prev, ...unique])
+    }
+    setTechInput('')
+  }
 
   const handleCreateWorkspace = async () => {
     const name = newWorkspaceName.trim()
@@ -210,7 +182,10 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
     .filter((s) => !s.isTerminal)
     .map((s) => ({ value: s.id, label: s.name }))
 
-  const workspaceOptions = workspaces.map((w) => ({ value: w.id, label: w.name }))
+  const workspaceSelectOptions = [
+    ...workspaces.map((w) => ({ value: w.id, label: w.name })),
+    { value: '__new__', label: '+ Nuevo workspace' },
+  ]
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true)
@@ -255,7 +230,7 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
               }
             }
           } catch {
-            // Technologies linking failed silently — offer was created successfully
+            // Technologies linking failed silently -- offer was created successfully
           }
         }
       }
@@ -270,6 +245,7 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
   const handleClose = () => {
     reset()
     setTechnologies([])
+    setTechInput('')
     onClose()
   }
 
@@ -294,21 +270,30 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
         <div className="grid grid-cols-3 gap-4">
           <Select
             label="Nivel"
-            options={levelOptions}
+            options={dropdownOptions.levels}
             placeholder="Seleccionar"
-            {...register('level')}
+            value={watchedValues.level || ''}
+            onChange={setField('level')}
+            creatable
+            onCreateOption={(opt) => addOption('levels', opt)}
           />
           <Select
             label="Tipo"
-            options={typeOptions}
+            options={dropdownOptions.types}
             placeholder="Seleccionar"
-            {...register('type')}
+            value={watchedValues.type || ''}
+            onChange={setField('type')}
+            creatable
+            onCreateOption={(opt) => addOption('types', opt)}
           />
           <Select
             label="Modalidad"
-            options={modalityOptions}
+            options={dropdownOptions.modalities}
             placeholder="Seleccionar"
-            {...register('modality')}
+            value={watchedValues.modality || ''}
+            onChange={setField('modality')}
+            creatable
+            onCreateOption={(opt) => addOption('modalities', opt)}
           />
         </div>
 
@@ -327,13 +312,19 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
           />
           <Select
             label="Moneda"
-            options={currencyOptions}
-            {...register('salaryCurrency')}
+            options={dropdownOptions.currencies}
+            value={watchedValues.salaryCurrency || ''}
+            onChange={setField('salaryCurrency')}
+            creatable
+            onCreateOption={(opt) => addOption('currencies', opt)}
           />
           <Select
             label="Periodo"
-            options={periodOptions}
-            {...register('salaryPeriod')}
+            options={dropdownOptions.periods}
+            value={watchedValues.salaryPeriod || ''}
+            onChange={setField('salaryPeriod')}
+            creatable
+            onCreateOption={(opt) => addOption('periods', opt)}
           />
         </div>
 
@@ -346,9 +337,12 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
           />
           <Select
             label="Plataforma"
-            options={platformOptions}
+            options={dropdownOptions.platforms}
             placeholder="Seleccionar"
-            {...register('sourcePlatform')}
+            value={watchedValues.sourcePlatform || ''}
+            onChange={setField('sourcePlatform')}
+            creatable
+            onCreateOption={(opt) => addOption('platforms', opt)}
           />
         </div>
 
@@ -357,7 +351,8 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
             label="Etapa"
             options={stageOptions}
             placeholder="Sin etapa"
-            {...register('currentStageId')}
+            value={watchedValues.currentStageId || ''}
+            onChange={setField('currentStageId')}
           />
           <div>
             <label className="mb-1 block text-sm text-text-secondary">Workspace</label>
@@ -378,29 +373,22 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
                   Crear
                 </Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => { setCreatingWorkspace(false); setNewWorkspaceName('') }}>
-                  &times;
+                  x
                 </Button>
               </div>
             ) : (
-              <div className="flex gap-2">
-                <select
-                  value={currentWorkspaceId || ''}
-                  onChange={(e) => {
-                    if (e.target.value === '__new__') {
-                      setCreatingWorkspace(true)
-                    } else {
-                      setValue('workspaceId', e.target.value)
-                    }
-                  }}
-                  className="w-full rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary outline-none focus:border-text-secondary"
-                >
-                  <option value="">Sin workspace</option>
-                  {workspaceOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                  <option value="__new__">+ Nuevo workspace</option>
-                </select>
-              </div>
+              <Select
+                options={workspaceSelectOptions}
+                placeholder="Sin workspace"
+                value={watchedValues.workspaceId || ''}
+                onChange={(e) => {
+                  if (e.target.value === '__new__') {
+                    setCreatingWorkspace(true)
+                  } else {
+                    setValue('workspaceId', e.target.value)
+                  }
+                }}
+              />
             )}
           </div>
         </div>
@@ -409,19 +397,31 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
           label="CV Enviado"
           options={cvOptions.map((cv) => ({ value: cv.id, label: cv.label }))}
           placeholder="Sin CV"
-          {...register('cvSnapshotId')}
+          value={watchedValues.cvSnapshotId || ''}
+          onChange={setField('cvSnapshotId')}
         />
 
-        <Textarea
-          label="Notas"
-          placeholder="Notas adicionales..."
-          {...register('notes')}
-        />
-
-        {technologies.length > 0 && (
-          <div>
-            <label className="mb-1 block text-sm text-text-secondary">Tecnologias</label>
-            <div className="flex flex-wrap gap-1.5">
+        <div>
+          <label className="mb-1 block text-sm text-text-secondary">Tecnologias / Habilidades</label>
+          <div className="flex gap-2">
+            <input
+              value={techInput}
+              onChange={(e) => setTechInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addTech()
+                }
+              }}
+              placeholder="React, Go, AWS... (Enter para agregar)"
+              className="w-full rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-text-secondary"
+            />
+            <Button type="button" size="sm" variant="secondary" onClick={addTech} disabled={!techInput.trim()}>
+              Agregar
+            </Button>
+          </div>
+          {technologies.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {technologies.map((tech) => (
                 <span
                   key={tech}
@@ -433,13 +433,19 @@ export const NewOfferModal = ({ open, onClose, offer, onUpdated, prefill, prefil
                     onClick={() => setTechnologies(prev => prev.filter(t => t !== tech))}
                     className="ml-0.5 text-text-muted hover:text-text-primary"
                   >
-                    &times;
+                    x
                   </button>
                 </span>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        <Textarea
+          label="Notas"
+          placeholder="Notas adicionales..."
+          {...register('notes')}
+        />
 
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="ghost" onClick={handleClose}>

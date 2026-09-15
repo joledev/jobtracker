@@ -71,9 +71,10 @@ This starts:
 ### 3. Run database migrations
 
 ```bash
-# Apply the schema
-cat drizzle/0000_third_gravity.sql | \
-  docker compose exec -T postgres psql -U jobtracker -d jobtracker
+# Apply every migration, not just the first one. Piping 0000 by hand skips
+# 0001, which adds the `type`, `updated_at` and `deleted_at` columns that the
+# CV manager routes query -- GET /api/cvs fails without them.
+docker compose exec api bun run db:migrate
 ```
 
 ### 4. Seed initial data
@@ -101,18 +102,12 @@ curl -H "X-API-Key: YOUR_MASTER_API_KEY" http://localhost:3000/api/offers
 
 ### 6. Expose to the internet
 
-**Option 1 — Direct (no domain):**
+> **The API key travels in the `X-API-Key` header on every single request.**
+> Over plain HTTP it is readable by anyone on the path: the coffee-shop Wi-Fi,
+> the hotel network, every hop in between. Keys are stored hashed server-side,
+> which protects them at rest but does nothing in transit. Use TLS.
 
-Change the API port binding in `docker-compose.yml`:
-
-```yaml
-ports:
-  - "0.0.0.0:3000:3000"  # was 127.0.0.1:3000:3000
-```
-
-Your API URL: `http://YOUR_VPS_IP:3000`
-
-**Option 2 — With domain + HTTPS (recommended):**
+**Option 1 — With domain + HTTPS (recommended):**
 
 Point your domain's DNS to your server IP, then configure the included Nginx with certbot or use a reverse proxy like Caddy/Traefik.
 
@@ -132,6 +127,20 @@ sudo systemctl restart caddy
 ```
 
 Your API URL: `https://jobtracker.yourdomain.com`
+
+
+**Option 2 — Direct, no domain (local network or testing only):**
+
+```yaml
+ports:
+  - "0.0.0.0:3000:3000"  # was 127.0.0.1:3000:3000
+```
+
+Your API URL: `http://YOUR_VPS_IP:3000`
+
+This exposes the API over plain HTTP. Every request carries your API key in
+clear text, so only do this on a network you control, or behind a VPN. For
+anything reachable from the internet, use Option 1.
 
 ---
 

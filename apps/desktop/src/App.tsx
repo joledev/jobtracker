@@ -1,11 +1,12 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
 import { OffersPage } from '@/pages/OffersPage'
 import { OfferDetailPage } from '@/pages/OfferDetailPage'
 import { Spinner } from '@/components/ui/Spinner'
-import { useConnectionStore } from '@/stores/connection'
+import { useConnectionStore, useDataReady } from '@/stores/connection'
 import { usePipelineStore } from '@/stores/pipeline'
+import { useDropdownOptionsStore } from '@/stores/dropdown-options'
 import { initLocalDb } from '@/lib/local-db'
 
 const TimelinePage = lazy(() => import('@/pages/TimelinePage').then((m) => ({ default: m.TimelinePage })))
@@ -16,15 +17,17 @@ const App = () => {
   const loadFromStore = useConnectionStore((s) => s.loadFromStore)
   const isLoaded = useConnectionStore((s) => s.isLoaded)
   const storageMode = useConnectionStore((s) => s.storageMode)
-  const vpsUrl = useConnectionStore((s) => s.vpsUrl)
-  const apiKey = useConnectionStore((s) => s.apiKey)
   const fetchStages = usePipelineStore((s) => s.fetchStages)
   const fetchWorkspaces = usePipelineStore((s) => s.fetchWorkspaces)
-  const [dbReady, setDbReady] = useState(false)
+
+  const loadDropdownOptions = useDropdownOptionsStore((s) => s.loadOptions)
+  const setDbReady = useConnectionStore((s) => s.setDbReady)
+  const dataReady = useDataReady()
 
   useEffect(() => {
     loadFromStore()
-  }, [loadFromStore])
+    loadDropdownOptions()
+  }, [loadFromStore, loadDropdownOptions])
 
   // Initialize local SQLite when in local mode
   useEffect(() => {
@@ -36,14 +39,14 @@ const App = () => {
     }
   }, [isLoaded, storageMode])
 
+  // Misma fuente de verdad que OffersPage: repetir la formula aqui es
+  // exactamente lo que dejo la condicion desalineada en cuatro sitios.
   useEffect(() => {
-    if (!dbReady) return
-    const ready = storageMode === 'local' || (vpsUrl && apiKey)
-    if (ready) {
+    if (dataReady) {
       fetchStages()
       fetchWorkspaces()
     }
-  }, [dbReady, storageMode, vpsUrl, apiKey, fetchStages, fetchWorkspaces])
+  }, [dataReady, fetchStages, fetchWorkspaces])
 
   return (
     <BrowserRouter>

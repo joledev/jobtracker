@@ -139,6 +139,20 @@ export const listQuestionsQuerySchema = z.object({
 	category: z.string().optional(),
 })
 
+// --- Reminders ---
+
+export const createReminderSchema = z.object({
+	title: z.string().min(1),
+	scheduledAt: z.string().datetime(),
+	locationType: z.enum(['video', 'in_person']).default('video'),
+	videoLink: z.string().url().optional(),
+	address: z.string().optional(),
+	contactId: z.string().uuid().optional(),
+	notes: z.string().optional(),
+})
+
+export const updateReminderSchema = createReminderSchema.partial()
+
 // --- CV Snapshots ---
 
 export const createCvSnapshotSchema = z.object({
@@ -149,13 +163,15 @@ export const createCvSnapshotSchema = z.object({
 	compiledPdf: z.string().optional(),
 })
 
-export const updateCvSnapshotSchema = z.object({
-	label: z.string().min(1),
-	type: z.enum(['cv', 'cover_letter']),
-	latexSource: z.string(),
-	notes: z.string().optional(),
-	compiledPdf: z.string().optional(),
-}).partial()
+export const updateCvSnapshotSchema = z
+	.object({
+		label: z.string().min(1),
+		type: z.enum(['cv', 'cover_letter']),
+		latexSource: z.string(),
+		notes: z.string().optional(),
+		compiledPdf: z.string().optional(),
+	})
+	.partial()
 
 export const listCvsQuerySchema = z.object({
 	type: z.enum(['cv', 'cover_letter']).optional(),
@@ -204,5 +220,7 @@ export type ListQuestionsQuery = z.infer<typeof listQuestionsQuerySchema>
 export type CreateCvSnapshotInput = z.infer<typeof createCvSnapshotSchema>
 export type UpdateCvSnapshotInput = z.infer<typeof updateCvSnapshotSchema>
 export type ListCvsQuery = z.infer<typeof listCvsQuerySchema>
+export type CreateReminderInput = z.infer<typeof createReminderSchema>
+export type UpdateReminderInput = z.infer<typeof updateReminderSchema>
 export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>
 export type TimelineQuery = z.infer<typeof timelineQuerySchema>

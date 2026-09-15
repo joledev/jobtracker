@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
-import { useApi } from '@/lib/api'
+import { Trash2 } from 'lucide-react'
+import { useApi, ApiClientError } from '@/lib/api'
 import { usePipelineStore } from '@/stores/pipeline'
+import { useOffersStore } from '@/stores/offers'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+import { Select } from '@/components/ui/Select'
+import { Modal } from '@/components/ui/Modal'
 import { Spinner } from '@/components/ui/Spinner'
 import type { Workspace } from '@/types/api'
 
 interface WorkspaceRowProps {
   workspace: Workspace
   onSave: (id: string, data: { name: string; description: string; color: string }) => Promise<void>
-  onDelete: (id: string) => void
+  onDelete: (ws: Workspace) => void
 }
 
 const WorkspaceRow = ({ workspace, onSave, onDelete }: WorkspaceRowProps) => {
@@ -60,7 +64,8 @@ const WorkspaceRow = ({ workspace, onSave, onDelete }: WorkspaceRowProps) => {
             Guardar cambios
           </Button>
         )}
-        <Button size="sm" variant="danger" onClick={() => onDelete(workspace.id)}>
+        <Button size="sm" variant="danger" onClick={() => onDelete(workspace)}>
+          <Trash2 size={14} />
           Eliminar
         </Button>
       </div>
@@ -68,9 +73,103 @@ const WorkspaceRow = ({ workspace, onSave, onDelete }: WorkspaceRowProps) => {
   )
 }
 
+interface DeleteDialogProps {
+  workspace: Workspace
+  offerCount: number
+  otherWorkspaces: Workspace[]
+  onConfirm: (action: 'delete_offers' | 'move_offers', targetId?: string) => Promise<void>
+  onCancel: () => void
+}
+
+const DeleteDialog = ({ workspace, offerCount, otherWorkspaces, onConfirm, onCancel }: DeleteDialogProps) => {
+  const [action, setAction] = useState<'delete_offers' | 'move_offers'>('move_offers')
+  const [targetId, setTargetId] = useState(otherWorkspaces[0]?.id || '')
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleConfirm = async () => {
+    setIsDeleting(true)
+    try {
+      await onConfirm(action, action === 'move_offers' ? targetId : undefined)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  return (
+    <Modal open onClose={onCancel} title="Eliminar workspace" size="md">
+      <div className="space-y-4">
+        <p className="text-sm text-text-secondary">
+          El workspace <span className="font-medium text-text-primary">{workspace.name}</span> tiene{' '}
+          <span className="font-medium text-text-primary">{offerCount}</span> oferta{offerCount > 1 ? 's' : ''} activa{offerCount > 1 ? 's' : ''}.
+        </p>
+
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 rounded-md border border-border p-3 cursor-pointer hover:bg-bg-hover transition-colors">
+            <input
+              type="radio"
+              name="action"
+              checked={action === 'move_offers'}
+              onChange={() => setAction('move_offers')}
+              className="accent-status-applied"
+            />
+            <div>
+              <p className="text-sm text-text-primary">Mover ofertas a otro workspace</p>
+              <p className="text-xs text-text-muted">Las ofertas se conservan en el workspace seleccionado</p>
+            </div>
+          </label>
+
+          {action === 'move_offers' && otherWorkspaces.length > 0 && (
+            <div className="ml-6">
+              <Select
+                options={otherWorkspaces.map((w) => ({ value: w.id, label: w.name }))}
+                placeholder="Seleccionar workspace destino"
+                value={targetId}
+                onChange={(e) => setTargetId(e.target.value)}
+              />
+            </div>
+          )}
+
+          {action === 'move_offers' && otherWorkspaces.length === 0 && (
+            <p className="ml-6 text-xs text-status-rejected">No hay otros workspaces disponibles. Crea uno primero o elimina las ofertas.</p>
+          )}
+
+          <label className="flex items-center gap-2 rounded-md border border-border p-3 cursor-pointer hover:bg-bg-hover transition-colors">
+            <input
+              type="radio"
+              name="action"
+              checked={action === 'delete_offers'}
+              onChange={() => setAction('delete_offers')}
+              className="accent-status-rejected"
+            />
+            <div>
+              <p className="text-sm text-text-primary">Eliminar las ofertas junto con el workspace</p>
+              <p className="text-xs text-status-rejected">Esta accion no se puede deshacer</p>
+            </div>
+          </label>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleConfirm}
+            loading={isDeleting}
+            disabled={action === 'move_offers' && !targetId}
+          >
+            Eliminar workspace
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export const WorkspacesSettings = () => {
   const api = useApi()
   const fetchWorkspaces = usePipelineStore((s) => s.fetchWorkspaces)
+  const fetchOffers = useOffersStore((s) => s.fetchOffers)
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
@@ -78,6 +177,7 @@ export const WorkspacesSettings = () => {
   const [newDesc, setNewDesc] = useState('')
   const [newColor, setNewColor] = useState('#4a7c59')
   const [isCreating, setIsCreating] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ workspace: Workspace; offerCount: number } | null>(null)
 
   const load = async () => {
     setIsLoading(true)
@@ -99,11 +199,30 @@ export const WorkspacesSettings = () => {
     fetchWorkspaces()
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar este workspace?')) return
-    await api.workspaces.delete(id)
+  const handleDeleteClick = async (ws: Workspace) => {
+    try {
+      // Try delete without action -- API returns 409 if has offers
+      await api.workspaces.delete(ws.id)
+      await load()
+      fetchWorkspaces()
+    } catch (e) {
+      if (e instanceof ApiClientError && e.status === 409) {
+        const count = (e.body?.offerCount as number) || 0
+        setDeleteTarget({ workspace: ws, offerCount: count })
+      }
+    }
+  }
+
+  const handleDeleteConfirm = async (action: 'delete_offers' | 'move_offers', targetId?: string) => {
+    if (!deleteTarget) return
+    await api.workspaces.delete(deleteTarget.workspace.id, {
+      action,
+      targetWorkspaceId: targetId,
+    })
+    setDeleteTarget(null)
     await load()
     fetchWorkspaces()
+    fetchOffers()
   }
 
   const handleCreate = async () => {
@@ -148,7 +267,7 @@ export const WorkspacesSettings = () => {
       ) : (
         <div className="space-y-3">
           {workspaces.map((ws) => (
-            <WorkspaceRow key={ws.id} workspace={ws} onSave={handleSave} onDelete={handleDelete} />
+            <WorkspaceRow key={ws.id} workspace={ws} onSave={handleSave} onDelete={handleDeleteClick} />
           ))}
         </div>
       )}
@@ -183,6 +302,16 @@ export const WorkspacesSettings = () => {
             </Button>
           </div>
         </div>
+      )}
+
+      {deleteTarget && (
+        <DeleteDialog
+          workspace={deleteTarget.workspace}
+          offerCount={deleteTarget.offerCount}
+          otherWorkspaces={workspaces.filter((w) => w.id !== deleteTarget.workspace.id)}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
     </div>
   )

@@ -1,4 +1,5 @@
 import Database from '@tauri-apps/plugin-sql'
+import { ApiClientError } from './api'
 import type { ApiClient } from './api'
 import type {
   OfferListItem,
@@ -24,6 +25,9 @@ import type {
   CreateQuestionInput,
   UpdateQuestionInput,
   AddTechnologyInput,
+  Reminder,
+  CreateReminderInput,
+  UpdateReminderInput,
   StatusLogEntry,
   TimelineResponse,
   TimelineFilters,
@@ -169,6 +173,22 @@ export async function initLocalDb(): Promise<void> {
     asked_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
+  )`)
+
+  await db.execute(`CREATE TABLE IF NOT EXISTS reminders (
+    id TEXT PRIMARY KEY,
+    offer_id TEXT NOT NULL REFERENCES offers(id),
+    title TEXT NOT NULL,
+    scheduled_at TEXT NOT NULL,
+    location_type TEXT NOT NULL DEFAULT 'video',
+    video_link TEXT,
+    address TEXT,
+    contact_id TEXT REFERENCES contacts(id),
+    notes TEXT,
+    completed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT
   )`)
 
   // Seed default pipeline stages if empty
@@ -416,16 +436,27 @@ export function createLocalClient(): ApiClient {
 
       changeStatus: async (id: string, data: ChangeStatusInput) => {
         const d = getDb()
-        const rows = await d.select<[{ current_stage_id: string | null }]>(
-          'SELECT current_stage_id FROM offers WHERE id = $1', [id],
+        const rows = await d.select<{ current_stage_id: string | null }[]>(
+          'SELECT current_stage_id FROM offers WHERE id = $1 AND deleted_at IS NULL', [id],
         )
+        // El servidor devuelve 404 si la oferta no existe. Antes, aqui una oferta
+        // inexistente producia un UPDATE que no afectaba a nada y una entrada de
+        // historial huerfana, devolviendo success: true.
+        if (rows.length === 0) throw new Error('Offer not found')
+
         const fromStageId = rows[0]?.current_stage_id ?? null
         const ts = now()
-        await d.execute('UPDATE offers SET current_stage_id = $1, updated_at = $2 WHERE id = $3', [data.stageId, ts, id])
+
+        // Sin transaccion: el plugin SQL solo expone execute sobre un pool, asi
+        // que BEGIN y COMMIT pueden caer en conexiones distintas. El historial va
+        // primero para que un corte deje una entrada visible y reintentable, no
+        // una etapa cambiada sin rastro.
         await d.execute(
           'INSERT INTO offer_status_log (id, offer_id, from_stage_id, to_stage_id, note, changed_at) VALUES ($1,$2,$3,$4,$5,$6)',
           [uuid(), id, fromStageId, data.stageId, data.note ?? null, ts],
         )
+        await d.execute('UPDATE offers SET current_stage_id = $1, updated_at = $2 WHERE id = $3', [data.stageId, ts, id])
+
         return { success: true, fromStageId: fromStageId ?? null, toStageId: data.stageId }
       },
 
@@ -527,6 +558,89 @@ export function createLocalClient(): ApiClient {
 
       deleteQuestion: async (_offerId: string, qId: string) => {
         await getDb().execute('DELETE FROM interview_questions WHERE id = $1', [qId])
+      },
+
+      listReminders: async (offerId: string) => {
+        const d = getDb()
+        const rows = await d.select<Record<string, unknown>[]>(
+          `SELECT r.*, c.name as contact_name FROM reminders r
+           LEFT JOIN contacts c ON r.contact_id = c.id
+           WHERE r.offer_id = $1 AND r.deleted_at IS NULL ORDER BY r.scheduled_at ASC`, [offerId],
+        )
+        return rows.map((r) => ({
+          id: r.id as string, offerId: r.offer_id as string, title: r.title as string,
+          scheduledAt: r.scheduled_at as string, locationType: r.location_type as 'video' | 'in_person',
+          videoLink: r.video_link as string | null, address: r.address as string | null,
+          contactId: r.contact_id as string | null, contactName: r.contact_name as string | null,
+          notes: r.notes as string | null, completedAt: r.completed_at as string | null,
+          createdAt: r.created_at as string, updatedAt: r.updated_at as string,
+        })) as Reminder[]
+      },
+
+      createReminder: async (offerId: string, data: CreateReminderInput) => {
+        const d = getDb()
+        const id = uuid()
+        const ts = now()
+        await d.execute(
+          `INSERT INTO reminders (id, offer_id, title, scheduled_at, location_type, video_link, address, contact_id, notes, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          [id, offerId, data.title, data.scheduledAt, data.locationType ?? 'video', data.videoLink ?? null, data.address ?? null, data.contactId ?? null, data.notes ?? null, ts, ts],
+        )
+        return {
+          id, offerId, title: data.title, scheduledAt: data.scheduledAt,
+          locationType: data.locationType ?? 'video', videoLink: data.videoLink ?? null,
+          address: data.address ?? null, contactId: data.contactId ?? null,
+          notes: data.notes ?? null, completedAt: null, createdAt: ts, updatedAt: ts,
+        } as Reminder
+      },
+
+      updateReminder: async (offerId: string, reminderId: string, data: UpdateReminderInput) => {
+        const d = getDb()
+        const sets: string[] = []
+        const params: unknown[] = []
+        let idx = 1
+        if (data.title !== undefined) { sets.push(`title = $${idx++}`); params.push(data.title) }
+        if (data.scheduledAt !== undefined) { sets.push(`scheduled_at = $${idx++}`); params.push(data.scheduledAt) }
+        if (data.locationType !== undefined) { sets.push(`location_type = $${idx++}`); params.push(data.locationType) }
+        if (data.videoLink !== undefined) { sets.push(`video_link = $${idx++}`); params.push(data.videoLink) }
+        if (data.address !== undefined) { sets.push(`address = $${idx++}`); params.push(data.address) }
+        if (data.contactId !== undefined) { sets.push(`contact_id = $${idx++}`); params.push(data.contactId) }
+        if (data.notes !== undefined) { sets.push(`notes = $${idx++}`); params.push(data.notes) }
+        sets.push(`updated_at = $${idx++}`)
+        params.push(now())
+        params.push(reminderId)
+        params.push(offerId)
+        await d.execute(`UPDATE reminders SET ${sets.join(', ')} WHERE id = $${idx} AND offer_id = $${idx + 1}`, params)
+        const rows = await d.select<Record<string, unknown>[]>('SELECT * FROM reminders WHERE id = $1', [reminderId])
+        const r = rows[0]
+        return {
+          id: r.id as string, offerId: r.offer_id as string, title: r.title as string,
+          scheduledAt: r.scheduled_at as string, locationType: r.location_type as 'video' | 'in_person',
+          videoLink: r.video_link as string | null, address: r.address as string | null,
+          contactId: r.contact_id as string | null, notes: r.notes as string | null,
+          completedAt: r.completed_at as string | null,
+          createdAt: r.created_at as string, updatedAt: r.updated_at as string,
+        } as Reminder
+      },
+
+      completeReminder: async (offerId: string, reminderId: string) => {
+        const d = getDb()
+        const ts = now()
+        await d.execute(`UPDATE reminders SET completed_at = $1, updated_at = $2 WHERE id = $3 AND offer_id = $4`, [ts, ts, reminderId, offerId])
+        const rows = await d.select<Record<string, unknown>[]>('SELECT * FROM reminders WHERE id = $1', [reminderId])
+        const r = rows[0]
+        return {
+          id: r.id as string, offerId: r.offer_id as string, title: r.title as string,
+          scheduledAt: r.scheduled_at as string, locationType: r.location_type as 'video' | 'in_person',
+          videoLink: r.video_link as string | null, address: r.address as string | null,
+          contactId: r.contact_id as string | null, notes: r.notes as string | null,
+          completedAt: r.completed_at as string | null,
+          createdAt: r.created_at as string, updatedAt: r.updated_at as string,
+        } as Reminder
+      },
+
+      deleteReminder: async (offerId: string, reminderId: string) => {
+        await getDb().execute(`UPDATE reminders SET deleted_at = $1 WHERE id = $2 AND offer_id = $3`, [now(), reminderId, offerId])
       },
 
       addTechnology: async (offerId: string, data: AddTechnologyInput) => {
@@ -799,8 +913,56 @@ export function createLocalClient(): ApiClient {
         } as Workspace
       },
 
-      delete: async (id: string) => {
-        await getDb().execute('UPDATE workspaces SET deleted_at = $1 WHERE id = $2', [now(), id])
+      // Replica la semantica del servidor (services/api/src/routes/workspaces.ts).
+      // Antes ignoraba `opts` y solo marcaba el workspace como borrado, dejando
+      // sus ofertas apuntando a un workspace inexistente: no era solo una firma
+      // incompatible, era una divergencia de comportamiento entre los dos modos.
+      delete: async (
+        id: string,
+        opts?: { action?: 'delete_offers' | 'move_offers'; targetWorkspaceId?: string },
+      ): Promise<{ success: boolean; offersAffected: number }> => {
+        const d = getDb()
+
+        const conteo = await d.select<{ total: number }[]>(
+          'SELECT COUNT(*) AS total FROM offers WHERE workspace_id = $1 AND deleted_at IS NULL',
+          [id],
+        )
+        const total = conteo[0]?.total ?? 0
+
+        // Con ofertas dentro, borrar sin decir que hacer con ellas seria una
+        // perdida silenciosa. El servidor responde 400; aqui se lanza.
+        // Mismo tipo y status que el cliente remoto: la UI solo abre el dialogo
+        // de confirmacion ante un ApiClientError 409, asi que un Error simple
+        // hacia que en modo local el borrado fallara en silencio.
+        if (total > 0 && !opts?.action) {
+          throw new ApiClientError(409, 'Workspace has offers', { offerCount: total })
+        }
+
+        if (opts?.action === 'move_offers') {
+          if (!opts.targetWorkspaceId) {
+            throw new Error('targetWorkspaceId is required when moving offers')
+          }
+          const destino = await d.select<{ id: string }[]>(
+            'SELECT id FROM workspaces WHERE id = $1 AND deleted_at IS NULL',
+            [opts.targetWorkspaceId],
+          )
+          if (destino.length === 0) throw new Error('Target workspace not found')
+
+          await d.execute(
+            'UPDATE offers SET workspace_id = $1, updated_at = $2 WHERE workspace_id = $3 AND deleted_at IS NULL',
+            [opts.targetWorkspaceId, now(), id],
+          )
+        }
+
+        if (opts?.action === 'delete_offers') {
+          await d.execute(
+            'UPDATE offers SET deleted_at = $1 WHERE workspace_id = $2 AND deleted_at IS NULL',
+            [now(), id],
+          )
+        }
+
+        await d.execute('UPDATE workspaces SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL', [now(), id])
+        return { success: true, offersAffected: total }
       },
     },
 
