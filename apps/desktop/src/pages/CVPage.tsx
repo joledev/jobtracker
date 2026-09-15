@@ -22,7 +22,7 @@ export const CVPage = () => {
   useEffect(() => {
     fetchCvs()
     checkLatex()
-  }, [fetchCvs, checkLatex])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const id = searchParams.get('selected')

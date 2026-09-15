@@ -24,6 +24,9 @@ import type {
   CreateQuestionInput,
   UpdateQuestionInput,
   AddTechnologyInput,
+  Reminder,
+  CreateReminderInput,
+  UpdateReminderInput,
   StatusLogEntry,
   TimelineResponse,
   TimelineFilters,
@@ -169,6 +172,22 @@ export async function initLocalDb(): Promise<void> {
     asked_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
+  )`)
+
+  await db.execute(`CREATE TABLE IF NOT EXISTS reminders (
+    id TEXT PRIMARY KEY,
+    offer_id TEXT NOT NULL REFERENCES offers(id),
+    title TEXT NOT NULL,
+    scheduled_at TEXT NOT NULL,
+    location_type TEXT NOT NULL DEFAULT 'video',
+    video_link TEXT,
+    address TEXT,
+    contact_id TEXT REFERENCES contacts(id),
+    notes TEXT,
+    completed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT
   )`)
 
   // Seed default pipeline stages if empty
@@ -527,6 +546,88 @@ export function createLocalClient(): ApiClient {
 
       deleteQuestion: async (_offerId: string, qId: string) => {
         await getDb().execute('DELETE FROM interview_questions WHERE id = $1', [qId])
+      },
+
+      listReminders: async (offerId: string) => {
+        const d = getDb()
+        const rows = await d.select<Record<string, unknown>[]>(
+          `SELECT r.*, c.name as contact_name FROM reminders r
+           LEFT JOIN contacts c ON r.contact_id = c.id
+           WHERE r.offer_id = $1 AND r.deleted_at IS NULL ORDER BY r.scheduled_at ASC`, [offerId],
+        )
+        return rows.map((r) => ({
+          id: r.id as string, offerId: r.offer_id as string, title: r.title as string,
+          scheduledAt: r.scheduled_at as string, locationType: r.location_type as 'video' | 'in_person',
+          videoLink: r.video_link as string | null, address: r.address as string | null,
+          contactId: r.contact_id as string | null, contactName: r.contact_name as string | null,
+          notes: r.notes as string | null, completedAt: r.completed_at as string | null,
+          createdAt: r.created_at as string, updatedAt: r.updated_at as string,
+        })) as Reminder[]
+      },
+
+      createReminder: async (offerId: string, data: CreateReminderInput) => {
+        const d = getDb()
+        const id = uuid()
+        const ts = now()
+        await d.execute(
+          `INSERT INTO reminders (id, offer_id, title, scheduled_at, location_type, video_link, address, contact_id, notes, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          [id, offerId, data.title, data.scheduledAt, data.locationType ?? 'video', data.videoLink ?? null, data.address ?? null, data.contactId ?? null, data.notes ?? null, ts, ts],
+        )
+        return {
+          id, offerId, title: data.title, scheduledAt: data.scheduledAt,
+          locationType: data.locationType ?? 'video', videoLink: data.videoLink ?? null,
+          address: data.address ?? null, contactId: data.contactId ?? null,
+          notes: data.notes ?? null, completedAt: null, createdAt: ts, updatedAt: ts,
+        } as Reminder
+      },
+
+      updateReminder: async (offerId: string, reminderId: string, data: UpdateReminderInput) => {
+        const d = getDb()
+        const sets: string[] = []
+        const params: unknown[] = []
+        let idx = 1
+        if (data.title !== undefined) { sets.push(`title = $${idx++}`); params.push(data.title) }
+        if (data.scheduledAt !== undefined) { sets.push(`scheduled_at = $${idx++}`); params.push(data.scheduledAt) }
+        if (data.locationType !== undefined) { sets.push(`location_type = $${idx++}`); params.push(data.locationType) }
+        if (data.videoLink !== undefined) { sets.push(`video_link = $${idx++}`); params.push(data.videoLink) }
+        if (data.address !== undefined) { sets.push(`address = $${idx++}`); params.push(data.address) }
+        if (data.contactId !== undefined) { sets.push(`contact_id = $${idx++}`); params.push(data.contactId) }
+        if (data.notes !== undefined) { sets.push(`notes = $${idx++}`); params.push(data.notes) }
+        sets.push(`updated_at = $${idx++}`)
+        params.push(now())
+        params.push(reminderId)
+        await d.execute(`UPDATE reminders SET ${sets.join(', ')} WHERE id = $${idx} AND offer_id = '${offerId}'`, params)
+        const rows = await d.select<Record<string, unknown>[]>('SELECT * FROM reminders WHERE id = $1', [reminderId])
+        const r = rows[0]
+        return {
+          id: r.id as string, offerId: r.offer_id as string, title: r.title as string,
+          scheduledAt: r.scheduled_at as string, locationType: r.location_type as 'video' | 'in_person',
+          videoLink: r.video_link as string | null, address: r.address as string | null,
+          contactId: r.contact_id as string | null, notes: r.notes as string | null,
+          completedAt: r.completed_at as string | null,
+          createdAt: r.created_at as string, updatedAt: r.updated_at as string,
+        } as Reminder
+      },
+
+      completeReminder: async (offerId: string, reminderId: string) => {
+        const d = getDb()
+        const ts = now()
+        await d.execute(`UPDATE reminders SET completed_at = $1, updated_at = $2 WHERE id = $3 AND offer_id = $4`, [ts, ts, reminderId, offerId])
+        const rows = await d.select<Record<string, unknown>[]>('SELECT * FROM reminders WHERE id = $1', [reminderId])
+        const r = rows[0]
+        return {
+          id: r.id as string, offerId: r.offer_id as string, title: r.title as string,
+          scheduledAt: r.scheduled_at as string, locationType: r.location_type as 'video' | 'in_person',
+          videoLink: r.video_link as string | null, address: r.address as string | null,
+          contactId: r.contact_id as string | null, notes: r.notes as string | null,
+          completedAt: r.completed_at as string | null,
+          createdAt: r.created_at as string, updatedAt: r.updated_at as string,
+        } as Reminder
+      },
+
+      deleteReminder: async (offerId: string, reminderId: string) => {
+        await getDb().execute(`UPDATE reminders SET deleted_at = $1 WHERE id = $2 AND offer_id = $3`, [now(), reminderId, offerId])
       },
 
       addTechnology: async (offerId: string, data: AddTechnologyInput) => {

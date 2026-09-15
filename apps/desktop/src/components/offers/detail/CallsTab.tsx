@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
+import { PhoneIncoming, PhoneOutgoing } from 'lucide-react'
 import type { PhoneCall, CreateCallInput } from '@/types/api'
 
 const formatDateTime = (dateStr: string): string => {
@@ -89,8 +90,8 @@ export const CallsTab = ({ offerId }: CallsTabProps) => {
                   <span className="text-sm font-medium text-text-primary">
                     {call.phoneNumber || call.contactName || 'Desconocido'}
                   </span>
-                  <span className={`text-xs ${call.callType === 'inbound' ? 'text-status-applied' : 'text-status-interview'}`}>
-                    {call.callType === 'inbound' ? '← Entrada' : '→ Salida'}
+                  <span className={`inline-flex items-center gap-1 text-xs ${call.callType === 'inbound' ? 'text-status-applied' : 'text-status-interview'}`}>
+                    {call.callType === 'inbound' ? <><PhoneIncoming size={12} /> Entrada</> : <><PhoneOutgoing size={12} /> Salida</>}
                   </span>
                 </div>
                 <span className="text-xs text-text-muted">{formatDateTime(call.calledAt)}</span>

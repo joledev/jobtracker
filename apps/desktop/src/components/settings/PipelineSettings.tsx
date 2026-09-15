@@ -14,6 +14,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { GripVertical } from 'lucide-react'
 import { useApi } from '@/lib/api'
 import { usePipelineStore } from '@/stores/pipeline'
 import { Button } from '@/components/ui/Button'
@@ -37,7 +38,7 @@ const SortableStageRow = ({
       className="flex items-center gap-3 rounded-md bg-bg-card px-3 py-2.5"
     >
       <button {...attributes} {...listeners} className="cursor-grab text-text-muted hover:text-text-primary">
-        ⠿
+        <GripVertical size={16} />
       </button>
       <div
         className="h-4 w-4 rounded-sm border border-border"

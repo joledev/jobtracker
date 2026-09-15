@@ -169,6 +169,36 @@ export interface InterviewQuestion {
   updatedAt: string
 }
 
+// Reminders
+
+export interface Reminder {
+  id: string
+  offerId: string
+  title: string
+  scheduledAt: string
+  locationType: 'video' | 'in_person'
+  videoLink: string | null
+  address: string | null
+  contactId: string | null
+  contactName?: string | null
+  notes: string | null
+  completedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateReminderInput {
+  title: string
+  scheduledAt: string
+  locationType: 'video' | 'in_person'
+  videoLink?: string
+  address?: string
+  contactId?: string
+  notes?: string
+}
+
+export type UpdateReminderInput = Partial<CreateReminderInput>
+
 // Offer Technologies (from detail endpoint)
 
 export interface OfferTechnology {

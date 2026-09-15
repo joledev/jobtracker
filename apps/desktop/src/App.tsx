@@ -6,6 +6,7 @@ import { OfferDetailPage } from '@/pages/OfferDetailPage'
 import { Spinner } from '@/components/ui/Spinner'
 import { useConnectionStore } from '@/stores/connection'
 import { usePipelineStore } from '@/stores/pipeline'
+import { useDropdownOptionsStore } from '@/stores/dropdown-options'
 import { initLocalDb } from '@/lib/local-db'
 
 const TimelinePage = lazy(() => import('@/pages/TimelinePage').then((m) => ({ default: m.TimelinePage })))
@@ -22,9 +23,12 @@ const App = () => {
   const fetchWorkspaces = usePipelineStore((s) => s.fetchWorkspaces)
   const [dbReady, setDbReady] = useState(false)
 
+  const loadDropdownOptions = useDropdownOptionsStore((s) => s.loadOptions)
+
   useEffect(() => {
     loadFromStore()
-  }, [loadFromStore])
+    loadDropdownOptions()
+  }, [loadFromStore, loadDropdownOptions])
 
   // Initialize local SQLite when in local mode
   useEffect(() => {

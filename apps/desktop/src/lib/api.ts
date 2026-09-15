@@ -26,6 +26,9 @@ import type {
   CreateQuestionInput,
   UpdateQuestionInput,
   AddTechnologyInput,
+  Reminder,
+  CreateReminderInput,
+  UpdateReminderInput,
   StatusLogEntry,
   TimelineResponse,
   TimelineFilters,
@@ -46,22 +49,24 @@ export interface ApiError {
 
 export class ApiClientError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  body: Record<string, unknown> | null
+  constructor(status: number, message: string, body?: Record<string, unknown> | null) {
     super(message)
     this.status = status
+    this.body = body ?? null
   }
 }
 
-const handleApiError = (status: number, message: string) => {
+const handleApiError = (status: number, message: string, body?: Record<string, unknown> | null) => {
   // Lazy import to avoid circular deps — ui store may import from api
   import('@/stores/ui').then(({ useUiStore }) => {
     if (status === 401) {
-      useUiStore.getState().addToast('API Key invalida. Ve a Settings → Conexion.', 'error')
+      useUiStore.getState().addToast('API Key invalida. Ve a Settings -> Conexion.', 'error')
     } else if (status >= 500) {
       useUiStore.getState().addToast('Error del servidor. Intenta de nuevo.', 'error')
     }
   })
-  throw new ApiClientError(status, message)
+  throw new ApiClientError(status, message, body)
 }
 
 const createRequest = async <T>(
@@ -83,7 +88,7 @@ const createRequest = async <T>(
   if (!response.ok) {
     const body = await response.json().catch(() => null)
     const msg = body?.error || response.statusText || `HTTP ${response.status}`
-    handleApiError(response.status, msg)
+    handleApiError(response.status, msg, body)
   }
 
   return response.json() as Promise<T>
@@ -208,6 +213,31 @@ export const createApiClient = (baseUrl: string, apiKey: string) => ({
         method: 'DELETE',
       }),
 
+    listReminders: (offerId: string) =>
+      createRequest<Reminder[]>(baseUrl, apiKey, `/api/offers/${offerId}/reminders`),
+
+    createReminder: (offerId: string, data: CreateReminderInput) =>
+      createRequest<Reminder>(baseUrl, apiKey, `/api/offers/${offerId}/reminders`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateReminder: (offerId: string, reminderId: string, data: UpdateReminderInput) =>
+      createRequest<Reminder>(baseUrl, apiKey, `/api/offers/${offerId}/reminders/${reminderId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    completeReminder: (offerId: string, reminderId: string) =>
+      createRequest<Reminder>(baseUrl, apiKey, `/api/offers/${offerId}/reminders/${reminderId}/complete`, {
+        method: 'PATCH',
+      }),
+
+    deleteReminder: (offerId: string, reminderId: string) =>
+      createVoidRequest(baseUrl, apiKey, `/api/offers/${offerId}/reminders/${reminderId}`, {
+        method: 'DELETE',
+      }),
+
     getStatusLog: async (offerId: string): Promise<StatusLogEntry[]> => {
       const data = await createRequest<TimelineResponse>(
         baseUrl, apiKey,
@@ -284,8 +314,15 @@ export const createApiClient = (baseUrl: string, apiKey: string) => ({
         body: JSON.stringify(data),
       }),
 
-    delete: (id: string) =>
-      createVoidRequest(baseUrl, apiKey, `/api/workspaces/${id}`, { method: 'DELETE' }),
+    delete: (id: string, opts?: { action?: 'delete_offers' | 'move_offers'; targetWorkspaceId?: string }) => {
+      const query = buildQuery({
+        action: opts?.action,
+        target_workspace_id: opts?.targetWorkspaceId,
+      })
+      return createRequest<{ success: boolean; offersAffected: number }>(
+        baseUrl, apiKey, `/api/workspaces/${id}${query}`, { method: 'DELETE' },
+      )
+    },
   },
 
   technologies: {

@@ -1,7 +1,6 @@
 import { and, desc, eq, ilike, isNull, or } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { db } from '../db'
-import { escapeLike } from '../utils'
 import {
 	contacts,
 	cvSnapshots,
@@ -13,6 +12,7 @@ import {
 	technologies,
 	workspaces,
 } from '../db/schema'
+import { escapeLike } from '../utils'
 import {
 	changeOfferStatusSchema,
 	createOfferSchema,
@@ -62,7 +62,10 @@ offersRoute.get('/', async (c) => {
 				workspace_id ? eq(offers.workspaceId, workspace_id) : undefined,
 				stage_id ? eq(offers.currentStageId, stage_id) : undefined,
 				search
-					? or(ilike(offers.company, `%${escapeLike(search)}%`), ilike(offers.position, `%${escapeLike(search)}%`))
+					? or(
+							ilike(offers.company, `%${escapeLike(search)}%`),
+							ilike(offers.position, `%${escapeLike(search)}%`),
+						)
 					: undefined,
 			),
 		)

@@ -1,12 +1,13 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import { Briefcase, Clock, FileText, Settings, type LucideIcon } from 'lucide-react'
 import { usePipelineStore } from '@/stores/pipeline'
 import { useOffersStore } from '@/stores/offers'
 
-const navItems = [
-  { path: '/', label: 'Offers', icon: '☰' },
-  { path: '/timeline', label: 'Timeline', icon: '⏱' },
-  { path: '/cv', label: 'CV Manager', icon: '📄' },
-  { path: '/settings', label: 'Settings', icon: '⚙' },
+const navItems: { path: string; label: string; icon: LucideIcon }[] = [
+  { path: '/', label: 'Offers', icon: Briefcase },
+  { path: '/timeline', label: 'Timeline', icon: Clock },
+  { path: '/cv', label: 'CV Manager', icon: FileText },
+  { path: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export const Sidebar = () => {
@@ -40,7 +41,7 @@ export const Sidebar = () => {
                 }`
               }
             >
-              <span>{item.icon}</span>
+              <item.icon size={16} />
               <span>{item.label}</span>
             </NavLink>
 

@@ -1,8 +1,8 @@
 import { and, eq, ilike, isNull, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { db } from '../db'
-import { escapeLike } from '../utils'
 import { contacts, offerContacts, offers } from '../db/schema'
+import { escapeLike } from '../utils'
 import {
 	createContactSchema,
 	linkOfferContactSchema,
@@ -38,7 +38,10 @@ contactsRoute.get('/', async (c) => {
 		.from(contacts)
 		.where(
 			search
-				? or(ilike(contacts.name, `%${escapeLike(search)}%`), ilike(contacts.company, `%${escapeLike(search)}%`))
+				? or(
+						ilike(contacts.name, `%${escapeLike(search)}%`),
+						ilike(contacts.company, `%${escapeLike(search)}%`),
+					)
 				: undefined,
 		)
 		.limit(limit)

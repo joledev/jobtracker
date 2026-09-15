@@ -71,6 +71,11 @@ export const useCvsStore = create<CvsStore>((set, get) => ({
     const client = getClient()
     if (!client) return
     const updated = await client.cvs.update(id, data)
+    const { selected } = get()
+    // Preserve locally-compiled PDF if the API response doesn't include it
+    if (selected && data.compiledPdf && !updated.compiledPdf) {
+      updated.compiledPdf = data.compiledPdf
+    }
     set({ selected: updated })
     await get().fetchCvs()
   },
@@ -92,16 +97,20 @@ export const useCvsStore = create<CvsStore>((set, get) => ({
   checkLatex: async () => {
     try {
       const available = await invoke<boolean>('check_latex_installed')
+      console.log('[checkLatex] available:', available)
       set({ latexAvailable: available })
-    } catch {
+    } catch (e) {
+      console.error('[checkLatex] error:', e)
       set({ latexAvailable: false })
     }
   },
 
   compileLatex: async (source) => {
+    console.log('[compileLatex] called, source length:', source.length)
     set({ isCompiling: true, compileError: null })
     try {
       const base64 = await invoke<string>('compile_latex', { latexSource: source })
+      console.log('[compileLatex] success, pdf base64 length:', base64.length)
       const { selected } = get()
       if (selected) {
         set({ selected: { ...selected, latexSource: source, compiledPdf: base64 } })

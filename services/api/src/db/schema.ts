@@ -164,6 +164,25 @@ export const interviewQuestions = pgTable('interview_questions', {
 	updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+// Reminders — scheduled events per offer
+export const reminders = pgTable('reminders', {
+	id: uuid('id').defaultRandom().primaryKey(),
+	offerId: uuid('offer_id')
+		.notNull()
+		.references(() => offers.id),
+	title: text('title').notNull(),
+	scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
+	locationType: text('location_type').notNull().default('video'),
+	videoLink: text('video_link'),
+	address: text('address'),
+	contactId: uuid('contact_id').references(() => contacts.id),
+	notes: text('notes'),
+	completedAt: timestamp('completed_at', { withTimezone: true }),
+	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+	deletedAt: timestamp('deleted_at', { withTimezone: true }),
+})
+
 // API keys — authentication tokens
 export const apiKeys = pgTable('api_keys', {
 	id: uuid('id').defaultRandom().primaryKey(),

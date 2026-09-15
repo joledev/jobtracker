@@ -10,7 +10,7 @@ pub fn check_latex_installed() -> Result<bool, String> {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn compile_latex(latex_source: String) -> Result<String, String> {
     let dir = tempfile::tempdir().map_err(|e| format!("Failed to create temp dir: {}", e))?;
     let tex_path = dir.path().join("input.tex");

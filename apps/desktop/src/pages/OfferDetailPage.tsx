@@ -7,6 +7,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Select } from '@/components/ui/Select'
+import { ArrowLeft } from 'lucide-react'
 import { TabNav } from '@/components/ui/TabNav'
 import { NewOfferModal } from '@/components/offers/NewOfferModal'
 import { GeneralTab } from '@/components/offers/detail/GeneralTab'
@@ -15,7 +16,9 @@ import { ContactsTab } from '@/components/offers/detail/ContactsTab'
 import { CallsTab } from '@/components/offers/detail/CallsTab'
 import { TechnologiesTab } from '@/components/offers/detail/TechnologiesTab'
 import { QuestionsTab } from '@/components/offers/detail/QuestionsTab'
-import type { OfferDetail } from '@/types/api'
+import { RemindersTab } from '@/components/offers/detail/RemindersTab'
+import { ScreeningModal } from '@/components/offers/ScreeningModal'
+import type { OfferDetail, CreateReminderInput } from '@/types/api'
 
 const tabs = [
   { key: 'general', label: 'General' },
@@ -24,6 +27,7 @@ const tabs = [
   { key: 'calls', label: 'Llamadas' },
   { key: 'technologies', label: 'Tecnologias' },
   { key: 'questions', label: 'Preguntas' },
+  { key: 'reminders', label: 'Recordatorios' },
 ]
 
 export const OfferDetailPage = () => {
@@ -40,6 +44,8 @@ export const OfferDetailPage = () => {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [changingStage, setChangingStage] = useState(false)
   const [selectedStageId, setSelectedStageId] = useState('')
+  const [screeningModalOpen, setScreeningModalOpen] = useState(false)
+  const [pendingScreeningStageId, setPendingScreeningStageId] = useState('')
 
   const loadOffer = useCallback(async () => {
     if (!id) return
@@ -65,6 +71,14 @@ export const OfferDetailPage = () => {
 
   const handleChangeStage = async () => {
     if (!id || !selectedStageId) return
+
+    const targetStage = stages.find((s) => s.id === selectedStageId)
+    if (targetStage?.slug === 'screening') {
+      setPendingScreeningStageId(selectedStageId)
+      setScreeningModalOpen(true)
+      return
+    }
+
     try {
       await api.offers.changeStatus(id, { stageId: selectedStageId })
       setChangingStage(false)
@@ -73,6 +87,17 @@ export const OfferDetailPage = () => {
     } catch {
       // silent for now
     }
+  }
+
+  const handleScreeningConfirm = async (reminderData: CreateReminderInput) => {
+    if (!id) return
+    await api.offers.changeStatus(id, { stageId: pendingScreeningStageId })
+    await api.offers.createReminder(id, reminderData)
+    setScreeningModalOpen(false)
+    setChangingStage(false)
+    setSelectedStageId('')
+    setPendingScreeningStageId('')
+    await loadOffer()
   }
 
   const handleDelete = async () => {
@@ -111,7 +136,7 @@ export const OfferDetailPage = () => {
             onClick={() => navigate('/')}
             className="text-xs text-text-muted transition-colors hover:text-text-primary"
           >
-            ← Volver a ofertas
+            <ArrowLeft size={12} className="inline mr-1" />Volver a ofertas
           </button>
         </div>
         <div className="flex items-start justify-between">
@@ -168,7 +193,19 @@ export const OfferDetailPage = () => {
         {activeTab === 'calls' && <CallsTab offerId={offer.id} />}
         {activeTab === 'technologies' && <TechnologiesTab offer={offer} onRefresh={loadOffer} />}
         {activeTab === 'questions' && <QuestionsTab offerId={offer.id} />}
+        {activeTab === 'reminders' && <RemindersTab offerId={offer.id} />}
       </div>
+
+      {/* Screening modal */}
+      <ScreeningModal
+        open={screeningModalOpen}
+        onClose={() => {
+          setScreeningModalOpen(false)
+          setPendingScreeningStageId('')
+        }}
+        contacts={offer.contacts}
+        onConfirm={handleScreeningConfirm}
+      />
 
       {/* Edit modal */}
       <NewOfferModal
