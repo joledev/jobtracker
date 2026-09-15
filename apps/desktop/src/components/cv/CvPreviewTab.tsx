@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist'
 import { useCvsStore } from '@/stores/cvs'
 
@@ -10,8 +10,6 @@ GlobalWorkerOptions.workerSrc = new URL(
 export const CvPreviewTab = () => {
   const compiledPdf = useCvsStore((s) => s.selected?.compiledPdf)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(0)
 
   useEffect(() => {
     if (!compiledPdf || !containerRef.current) return
@@ -24,7 +22,6 @@ export const CvPreviewTab = () => {
       const pdf = await getDocument({ data: bytes }).promise
       if (cancelled) return
 
-      setTotalPages(pdf.numPages)
       container.innerHTML = ''
 
       for (let i = 1; i <= pdf.numPages; i++) {
@@ -41,11 +38,8 @@ export const CvPreviewTab = () => {
         canvas.style.margin = '0 auto 16px'
         canvas.style.borderRadius = '4px'
 
-        const ctx = canvas.getContext('2d')
-        if (!ctx) continue
-
         container.appendChild(canvas)
-        await page.render({ canvasContext: ctx, viewport }).promise
+        await page.render({ canvas, viewport }).promise
       }
     }
 
