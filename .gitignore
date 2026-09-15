@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
-bun.lockb
+# bun.lockb NO se ignora: el Dockerfile lo copia con
+# `COPY package.json bun.lockb ./` y `bun install --frozen-lockfile`,
+# asi que sin el versionado un `git clone` + `docker compose build`
+# falla. Un lockfile pertenece al repositorio.
 
 # Build output
 dist/
