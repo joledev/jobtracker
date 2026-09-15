@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApi, ApiClientError } from '@/lib/api'
 import { usePipelineStore } from '@/stores/pipeline'
+import { useUiStore } from '@/stores/ui'
 import { useOffersStore } from '@/stores/offers'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button } from '@/components/ui/Button'
@@ -43,6 +44,7 @@ export const OfferDetailPage = () => {
   const [activeTab, setActiveTab] = useState('general')
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [changingStage, setChangingStage] = useState(false)
+  const [stageSubmitting, setStageSubmitting] = useState(false)
   const [selectedStageId, setSelectedStageId] = useState('')
   const [screeningModalOpen, setScreeningModalOpen] = useState(false)
   const [pendingScreeningStageId, setPendingScreeningStageId] = useState('')
@@ -79,13 +81,21 @@ export const OfferDetailPage = () => {
       return
     }
 
+    // El cambio de etapa son dos escrituras que en modo local no pueden ir en
+    // una transaccion (el plugin SQL solo expone execute sobre un pool), asi que
+    // un doble clic es capaz de dejar el historial con dos entradas. Bloquear el
+    // boton mientras la promesa esta en vuelo es lo que cierra ese camino.
+    setStageSubmitting(true)
     try {
       await api.offers.changeStatus(id, { stageId: selectedStageId })
       setChangingStage(false)
       setSelectedStageId('')
       await loadOffer()
-    } catch {
-      // silent for now
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'No se pudo cambiar la etapa'
+      useUiStore.getState().addToast(msg, 'error')
+    } finally {
+      setStageSubmitting(false)
     }
   }
 
@@ -157,7 +167,7 @@ export const OfferDetailPage = () => {
                       onChange={(e) => setSelectedStageId(e.target.value)}
                     />
                   </div>
-                  <Button size="sm" onClick={handleChangeStage} disabled={!selectedStageId}>
+                  <Button size="sm" onClick={handleChangeStage} disabled={!selectedStageId || stageSubmitting}>
                     Confirmar
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setChangingStage(false)}>

@@ -1,4 +1,5 @@
 import Database from '@tauri-apps/plugin-sql'
+import { ApiClientError } from './api'
 import type { ApiClient } from './api'
 import type {
   OfferListItem,
@@ -446,22 +447,15 @@ export function createLocalClient(): ApiClient {
         const fromStageId = rows[0]?.current_stage_id ?? null
         const ts = now()
 
-        // Las dos escrituras van en una transaccion, como en
-        // services/api/src/routes/offers.ts. Sin ella, un corte entre ambas
-        // dejaba la etapa cambiada y el historial perdido en silencio: en un
-        // gestor de busqueda de empleo, esa es la peor perdida posible.
-        await d.execute('BEGIN')
-        try {
-          await d.execute('UPDATE offers SET current_stage_id = $1, updated_at = $2 WHERE id = $3', [data.stageId, ts, id])
-          await d.execute(
-            'INSERT INTO offer_status_log (id, offer_id, from_stage_id, to_stage_id, note, changed_at) VALUES ($1,$2,$3,$4,$5,$6)',
-            [uuid(), id, fromStageId, data.stageId, data.note ?? null, ts],
-          )
-          await d.execute('COMMIT')
-        } catch (e) {
-          await d.execute('ROLLBACK').catch(() => {})
-          throw e
-        }
+        // Sin transaccion: el plugin SQL solo expone execute sobre un pool, asi
+        // que BEGIN y COMMIT pueden caer en conexiones distintas. El historial va
+        // primero para que un corte deje una entrada visible y reintentable, no
+        // una etapa cambiada sin rastro.
+        await d.execute(
+          'INSERT INTO offer_status_log (id, offer_id, from_stage_id, to_stage_id, note, changed_at) VALUES ($1,$2,$3,$4,$5,$6)',
+          [uuid(), id, fromStageId, data.stageId, data.note ?? null, ts],
+        )
+        await d.execute('UPDATE offers SET current_stage_id = $1, updated_at = $2 WHERE id = $3', [data.stageId, ts, id])
 
         return { success: true, fromStageId: fromStageId ?? null, toStageId: data.stageId }
       },
@@ -615,7 +609,8 @@ export function createLocalClient(): ApiClient {
         sets.push(`updated_at = $${idx++}`)
         params.push(now())
         params.push(reminderId)
-        await d.execute(`UPDATE reminders SET ${sets.join(', ')} WHERE id = $${idx} AND offer_id = '${offerId}'`, params)
+        params.push(offerId)
+        await d.execute(`UPDATE reminders SET ${sets.join(', ')} WHERE id = $${idx} AND offer_id = $${idx + 1}`, params)
         const rows = await d.select<Record<string, unknown>[]>('SELECT * FROM reminders WHERE id = $1', [reminderId])
         const r = rows[0]
         return {
@@ -936,8 +931,11 @@ export function createLocalClient(): ApiClient {
 
         // Con ofertas dentro, borrar sin decir que hacer con ellas seria una
         // perdida silenciosa. El servidor responde 400; aqui se lanza.
+        // Mismo tipo y status que el cliente remoto: la UI solo abre el dialogo
+        // de confirmacion ante un ApiClientError 409, asi que un Error simple
+        // hacia que en modo local el borrado fallara en silencio.
         if (total > 0 && !opts?.action) {
-          throw new Error('Workspace has offers: choose delete_offers or move_offers')
+          throw new ApiClientError(409, 'Workspace has offers', { offerCount: total })
         }
 
         if (opts?.action === 'move_offers') {
