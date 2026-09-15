@@ -16,10 +16,12 @@ export const CvPreviewTab = () => {
 
     const container = containerRef.current
     let cancelled = false
+    let doc: Awaited<ReturnType<typeof getDocument>['promise']> | null = null
 
     const render = async () => {
       const bytes = Uint8Array.from(atob(compiledPdf), (c) => c.charCodeAt(0))
       const pdf = await getDocument({ data: bytes }).promise
+      doc = pdf
       if (cancelled) return
 
       container.innerHTML = ''
@@ -44,7 +46,12 @@ export const CvPreviewTab = () => {
     }
 
     render().catch(console.error)
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      // Cada documento mantiene vivo un worker de pdf.js: sin destroy() se
+      // acumula uno por cada PDF que se haya previsualizado.
+      doc?.destroy().catch(() => {})
+    }
   }, [compiledPdf])
 
   if (!compiledPdf) {

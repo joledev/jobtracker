@@ -62,14 +62,7 @@ export const useConnectionStore = create<ConnectionStore>((set) => ({
   },
 }))
 
-/**
- * Unica fuente de verdad para "ya se pueden pedir datos".
- *
- * La condicion estaba replicada en cuatro sitios con tres formulaciones
- * distintas, y una de ellas (OffersPage) exigia vpsUrl y apiKey incluso en modo
- * local, que es el modo por defecto: la lista de ofertas salia vacia en cada
- * arranque en frio aunque los datos estuvieran en el SQLite local.
- */
+/** Unica fuente de verdad para "ya se pueden pedir datos". */
 export const useDataReady = (): boolean =>
   useConnectionStore(
     (s) =>
