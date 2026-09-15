@@ -57,7 +57,7 @@ Desktop (Tauri) ──HTTPS + X-API-Key──→ Hono API (Bun) ──Drizzle─
 - **Desktop config:** `tauri-plugin-store` persists VPS URL, API key, active workspace.
 
 ### API route structure
-12 route files in `services/api/src/routes/`: `offers`, `workspaces`, `pipeline-stages`, `contacts`, `offer-contacts`, `calls`, `technologies`, `offer-technologies`, `questions`, `cvs`, `apikeys`, `timeline`, `health`.
+13 route files in `services/api/src/routes/`: `offers`, `workspaces`, `pipeline-stages`, `contacts`, `calls`, `technologies`, `questions`, `reminders`, `cvs`, `apikeys`, `timeline`, `health`, plus `schemas` (shared zod definitions, not a route). Note that `offer-contacts` and `offer-technologies` are exports of `contacts.ts` and `technologies.ts`, not files of their own.
 
 ### Desktop component organization
 - `components/ui/` — atoms (Button, Input, Modal, Select, etc.)

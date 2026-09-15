@@ -7,4 +7,5 @@
 *.jpg binary
 *.ico binary
 *.pdf binary
+*.icns binary
 *.lockb binary
