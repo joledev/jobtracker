@@ -99,7 +99,15 @@ jobs:
           cp .env.example .env
           sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci_test_password/" .env
           sed -i "s|YOUR_SECURE_PASSWORD|ci_test_password|g" .env
-          echo "MASTER_API_KEY=$(openssl rand -hex 32)" >> .env
+          # El .env.example ya trae una linea MASTER_API_KEY= vacia, asi que
+          # anadir otra dejaba dos: releerlas con grep devolvia ambas y el curl
+          # acababa mandando una cabecera con un salto de linea dentro, que el
+          # servidor rechaza con 400. Se sustituye la que existe y se guarda el
+          # valor para los pasos siguientes, en vez de releer el archivo.
+          KEY=$(openssl rand -hex 32)
+          sed -i "s/^MASTER_API_KEY=.*/MASTER_API_KEY=$KEY/" .env
+          echo "::add-mask::$KEY"
+          echo "MASTER_API_KEY=$KEY" >> "$GITHUB_ENV"
 
       - name: Start services
         run: docker compose up -d --build
@@ -128,11 +136,16 @@ jobs:
       # consultan columnas que solo esa migracion crea.
       - name: CV routes answer (regression guard for migration 0001)
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "X-API-Key: $(grep '^MASTER_API_KEY=' .env | cut -d= -f2)" \
+          body=$(mktemp)
+          code=$(curl -s -o "$body" -w "%{http_code}" \
+            -H "X-API-Key: $MASTER_API_KEY" \
             http://localhost:3000/api/cvs)
           echo "GET /api/cvs -> $code"
-          [ "$code" = "200" ] || { docker compose logs --tail=50 api; exit 1; }
+          if [ "$code" != "200" ]; then
+            echo "--- response body ---"; cat "$body"; echo
+            docker compose logs --tail=50 api
+            exit 1
+          fi
 
       - name: Stop services
         if: always()
