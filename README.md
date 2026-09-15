@@ -161,7 +161,7 @@ docker compose up -d
 docker compose exec api bun run db:migrate
 
 # Seed default data
-docker compose exec api bun run seed
+docker compose exec api bun run dist/db/seed.js
 
 # Verify
 curl http://localhost:3000/health

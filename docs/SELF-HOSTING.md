@@ -80,7 +80,7 @@ docker compose exec api bun run db:migrate
 ### 4. Seed initial data
 
 ```bash
-docker compose exec api bun run seed
+docker compose exec api bun run dist/db/seed.js
 ```
 
 This creates:

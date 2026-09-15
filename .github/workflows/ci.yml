@@ -122,7 +122,7 @@ jobs:
       # Creates the first API key from MASTER_API_KEY. Without this the
       # api_keys table is empty and every authenticated request gets 401.
       - name: Seed
-        run: docker compose exec -T api bun run seed
+        run: docker compose exec -T api bun run dist/db/seed.js
 
       # Sin la migracion 0001 este endpoint devuelve error: las rutas de CVs
       # consultan columnas que solo esa migracion crea.
