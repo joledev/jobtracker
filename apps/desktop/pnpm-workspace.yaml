@@ -1,2 +1,10 @@
+# Este proyecto no es un monorepo: el archivo existe solo para autorizar el
+# script de build de esbuild. pnpm exige el campo `packages` cuando el archivo
+# esta presente, y sin el `pnpm install` falla con "packages field missing or
+# empty" en cualquier instalacion limpia -- en local pasaba desapercibido porque
+# node_modules ya existia.
+packages:
+  - .
+
 allowBuilds:
   esbuild: true
