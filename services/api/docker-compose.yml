@@ -25,6 +25,12 @@ services:
     environment:
       DATABASE_URL: postgresql://jobtracker:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/jobtracker
       PORT: 3000
+      # The seed reads this to create the first API key. Without it here,
+      # `docker compose exec api bun run seed` -- the documented quick start --
+      # exits with "MASTER_API_KEY environment variable is required".
+      MASTER_API_KEY: ${MASTER_API_KEY:?Set MASTER_API_KEY in .env}
+      # Number of reverse proxies in front of the API. The bundled nginx is 1.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
     ports:
       - "127.0.0.1:3000:3000"
 

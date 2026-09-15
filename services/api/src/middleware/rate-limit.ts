@@ -1,19 +1,10 @@
 import { getConnInfo } from 'hono/bun'
 import { createMiddleware } from 'hono/factory'
 
-/**
- * Fixed-window rate limiter, in memory.
- *
- * The real risk here is not brute force: API keys are 256-bit, so guessing one
- * is not on the table. It is that every unauthenticated request reaches the
- * database to look up the key hash, and the pool holds 10 connections. Without
- * a limit, anyone who can reach the API can exhaust it without a credential.
- *
- * Written by hand rather than pulled in: Hono's core has no rate limiter, and
- * this instance is single-node, so a dependency plus a Redis store would buy
- * nothing. If the API is ever scaled past one process, this needs to move to a
- * shared store -- an in-memory window is per-process by definition.
- */
+// Fixed-window rate limiter, in memory. Guards the connection pool, not the
+// keys: 256-bit keys are not brute-forcible, but every unauthenticated request
+// still hits the database to look up the hash. Per-process by definition --
+// move to a shared store if this ever scales out.
 
 type Window = { count: number; resetAt: number }
 
@@ -22,7 +13,29 @@ const windows = new Map<string, Window>()
 const WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60_000
 const MAX_REQUESTS = Number(process.env.RATE_LIMIT_MAX) || 100
 
-// Without this the map grows one entry per distinct IP, forever.
+// Reverse proxies in front of this process (the bundled nginx is 1).
+// `getConnInfo` reads the raw TCP socket, so behind a proxy every request
+// carries the proxy's address and the per-IP limit collapses into one global
+// window -- worse than having no limiter at all.
+const TRUST_PROXY = Number(process.env.TRUST_PROXY) || 0
+
+// nginx appends the real client to any incoming X-Forwarded-For, so a forged
+// header only prepends entries: the trustworthy one is counted back from the
+// END, one hop per trusted proxy. Reading the first entry would let anyone pick
+// their own bucket and evade the limit.
+const clientKey = (xff: string | undefined, remote: string): string => {
+	if (TRUST_PROXY < 1) return remote
+	if (!xff) return remote
+	const chain = xff
+		.split(',')
+		.map((s) => s.trim())
+		.filter(Boolean)
+	// One trusted proxy -> last entry; two -> second to last, and so on.
+	const ip = chain[chain.length - TRUST_PROXY]
+	return ip || remote
+}
+
+// Without this the map grows one entry per distinct address, forever.
 const sweep = setInterval(() => {
 	const now = Date.now()
 	for (const [key, w] of windows) {
@@ -34,13 +47,13 @@ if (typeof sweep === 'object' && 'unref' in sweep) sweep.unref()
 
 export const rateLimit = createMiddleware(async (c, next) => {
 	const info = getConnInfo(c)
-	const ip = info.remote.address ?? 'unknown'
+	const key = clientKey(c.req.header('X-Forwarded-For'), info.remote.address ?? 'unknown')
 	const now = Date.now()
 
-	let w = windows.get(ip)
+	let w = windows.get(key)
 	if (!w || w.resetAt <= now) {
 		w = { count: 0, resetAt: now + WINDOW_MS }
-		windows.set(ip, w)
+		windows.set(key, w)
 	}
 	w.count++
 
