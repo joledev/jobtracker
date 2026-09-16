@@ -42,3 +42,9 @@ Thumbs.db
 
 # Claude Code internal
 .claude/
+
+# artefactos de makepkg — nunca versionar:
+# .BUILDINFO publica builddir y el inventario completo de paquetes del equipo
+packaging/arch/pkg/
+packaging/arch/src/
+packaging/arch/*.pkg.tar.zst
