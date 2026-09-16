@@ -238,7 +238,11 @@ docker push ghcr.io/YOUR_USER/jobtracker-api:latest
 
 2. Create a namespace and deploy PostgreSQL + API as Deployments/Services.
 
-3. Create an Ingress with your domain and cert-manager annotation:
+3. Create an Ingress with your domain and cert-manager annotation. Note
+`router.entrypoints: websecure`: without it the same Ingress also answers on
+port 80, and since the API authenticates with an `X-API-Key` header, anyone
+who reaches it over plain HTTP sends that key in the clear.
+
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -246,7 +250,9 @@ metadata:
   name: jobtracker
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
 spec:
+  ingressClassName: traefik
   rules:
     - host: jobtracker.yourdomain.com
       http:
@@ -263,6 +269,48 @@ spec:
         - jobtracker.yourdomain.com
       secretName: jobtracker-tls
 ```
+
+4. Send port 80 to HTTPS instead of leaving it unanswered, so an old
+bookmark or a copied `http://` URL still lands somewhere — just not in the
+clear:
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+spec:
+  redirectScheme:
+    scheme: https
+    port: "443"
+    permanent: true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jobtracker-http-redirect
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    # <namespace>-<middleware name>@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: jobtracker-redirect-https@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: jobtracker.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jobtracker-api
+                port:
+                  number: 3000
+```
+
+This does not break certificate renewal: cert-manager's HTTP-01 solver
+creates its own Ingress for `/.well-known/acme-challenge/...`, and that longer
+path wins over the catch-all `/` above.
 
 ---
 
