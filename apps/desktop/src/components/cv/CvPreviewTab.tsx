@@ -16,12 +16,13 @@ export const CvPreviewTab = () => {
 
     const container = containerRef.current
     let cancelled = false
-    let doc: Awaited<ReturnType<typeof getDocument>['promise']> | null = null
+    let loadingTask: ReturnType<typeof getDocument> | null = null
 
     const render = async () => {
       const bytes = Uint8Array.from(atob(compiledPdf), (c) => c.charCodeAt(0))
-      const pdf = await getDocument({ data: bytes }).promise
-      doc = pdf
+      const task = getDocument({ data: bytes })
+      loadingTask = task
+      const pdf = await task.promise
       if (cancelled) return
 
       container.innerHTML = ''
@@ -49,8 +50,10 @@ export const CvPreviewTab = () => {
     return () => {
       cancelled = true
       // Cada documento mantiene vivo un worker de pdf.js: sin destroy() se
-      // acumula uno por cada PDF que se haya previsualizado.
-      doc?.destroy().catch(() => {})
+      // acumula uno por cada PDF que se haya previsualizado. En pdfjs-dist 6
+      // destroy() ya no esta en PDFDocumentProxy sino en la tarea de carga,
+      // que es la que realmente cierra el worker.
+      loadingTask?.destroy().catch(() => {})
     }
   }, [compiledPdf])
 
