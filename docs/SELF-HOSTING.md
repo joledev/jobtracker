@@ -316,6 +316,14 @@ path wins over the catch-all `/` above.
 
 ## Connecting the Desktop App
 
+> **Set `CORS_ORIGIN` first.** The desktop app's browser origin is
+> `tauri://localhost`, and the API only answers origins listed in that variable
+> (comma-separated). Leave it out and the app shows an empty list with no error
+> anywhere: the server answers the preflight with a 204 and logs look healthy,
+> but the browser discards the response and never sends the real request. The
+> shipped default already includes `tauri://localhost`, so this only bites if
+> you set the variable yourself and forget it.
+
 1. Open JobTracker desktop
 2. Go to **Settings** > **Connection**
 3. Enter your API URL (e.g., `https://jobtracker.yourdomain.com` or `http://YOUR_IP:3000`)

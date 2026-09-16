@@ -21,12 +21,18 @@ import { workspacesRoute } from './routes/workspaces'
 const app = new Hono()
 
 app.use('*', logger())
-app.use(
-	'*',
-	cors({
-		origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-	}),
-)
+// El origen de la aplicacion de escritorio es `tauri://localhost`, y va en el
+// valor por defecto a proposito: sin el, quien se autoaloje la API descubre que
+// su propia aplicacion no puede hablar con ella, y el fallo aparece como una
+// lista vacia en vez de como un error — el navegador bloquea la peticion real
+// tras el preflight y no queda rastro en los registros del servidor.
+// CORS_ORIGIN acepta varios origenes separados por coma.
+const corsOrigins = (process.env.CORS_ORIGIN ?? 'tauri://localhost,http://localhost:5173')
+	.split(',')
+	.map((o) => o.trim())
+	.filter(Boolean)
+
+app.use('*', cors({ origin: corsOrigins }))
 app.use('*', secureHeaders())
 
 app.onError((err, c) => {
