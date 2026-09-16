@@ -21,6 +21,9 @@ set -u
 
 [ -r /etc/default/respaldo-jobtracker ] && . /etc/default/respaldo-jobtracker
 
+# La ruta real del despliegue se define en /etc/default/respaldo-jobtracker.
+# El valor por defecto es neutro a proposito: no debe revelar el usuario
+# ni la distribucion de directorios del servidor.
 COMPOSE_DIR="${COMPOSE_DIR:-/opt/jobtracker/services/api}"
 SERVICIO_DB="${SERVICIO_DB:-postgres}"
 BASE="${BASE:-jobtracker}"
