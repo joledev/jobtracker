@@ -14,20 +14,34 @@ arch=('x86_64')
 url="https://github.com/joledev/jobtracker"
 license=('MIT')
 # webkit2gtk-4.1 y gtk3 los necesita el binario en tiempo de ejecucion.
-depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator-gtk3' 'librsvg')
+depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator' 'librsvg')
 makedepends=('rust' 'cargo' 'pnpm' 'nodejs')
 provides=('jobtracker')
 conflicts=('jobtracker-bin')
 options=('!strip' '!debug')
+PACKAGER="Joel Ernesto Lopez Verdugo <contacto@joledev.com>"
 
 # Se construye desde el arbol de trabajo, no desde una fuente descargada.
-_srcdir="${startdir}/../.."
+#
+# `startdir` esta desaconsejado por `man 5 PKGBUILD` ("use of this variable is
+# deprecated and strongly discouraged"), asi que la ruta se resuelve desde la
+# ubicacion del propio PKGBUILD, estable sin importar desde donde se invoque.
+_pkgbuild_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_srcdir="${_pkgbuild_dir}/../.."
+
+prepare() {
+  # Las dependencias se obtienen aqui, no en build(): un build en chroot limpio
+  # no tiene red durante la compilacion.
+  cd "${_srcdir}/apps/desktop"
+  pnpm install --frozen-lockfile
+}
 
 build() {
   cd "${_srcdir}/apps/desktop"
-  pnpm install --frozen-lockfile
-  # Solo el binario: el empaquetado AppImage de Tauri falla en Arch por FUSE y
-  # aqui no hace falta, porque el paquete lo produce makepkg.
+  # Solo el binario. El empaquetado AppImage no se usa aqui por dos motivos:
+  # makepkg ya produce el paquete, y Tauri documenta que el AppImage debe
+  # construirse sobre el sistema base mas antiguo soportado (el CI usa Ubuntu),
+  # no sobre una distribucion rolling como Arch.
   pnpm tauri build --no-bundle
 }
 
@@ -53,4 +67,14 @@ DESKTOP
   if [ -f "${_srcdir}/LICENSE" ]; then
     install -Dm644 "${_srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
   fi
+
+  # Con pkgver fijo, dos compilaciones de commits distintos se reportan igual en
+  # `pacman -Qi`. Este archivo deja constancia de que codigo se instalo.
+  local _commit
+  _commit="$(git -C "${_srcdir}" rev-parse --short HEAD 2>/dev/null || echo desconocido)"
+  install -Dm644 /dev/stdin "${pkgdir}/usr/share/${pkgname}/BUILD_INFO" <<INFO
+commit: ${_commit}
+fecha:  $(date -u +%Y-%m-%dT%H:%M:%SZ)
+origen: arbol de trabajo local (${_srcdir})
+INFO
 }
