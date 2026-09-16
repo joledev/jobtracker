@@ -15,6 +15,10 @@ url="https://github.com/joledev/jobtracker"
 license=('MIT')
 # webkit2gtk-4.1 y gtk3 los necesita el binario en tiempo de ejecucion.
 depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator' 'librsvg')
+optdepends=(
+  'bubblewrap: aisla pdflatex del sistema de archivos al compilar un CV; sin el, una plantilla hostil puede leer archivos locales'
+  'texlive-latex: compilar los CV en LaTeX desde la aplicacion'
+)
 makedepends=('rust' 'cargo' 'pnpm' 'nodejs')
 provides=('jobtracker')
 conflicts=('jobtracker-bin')
