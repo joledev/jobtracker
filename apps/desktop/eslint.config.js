@@ -6,7 +6,11 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // `src-tauri/target` guarda artefactos de cargo, entre ellos .js y .mjs
+  // generados por tauri-codegen que no son codigo fuente. En el CI no existen
+  // porque el job de Desktop no compila Rust, pero en local aparecen en cuanto
+  // se corre `cargo build` y ensucian el lint con errores de parseo.
+  globalIgnores(['dist', 'src-tauri/target']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
