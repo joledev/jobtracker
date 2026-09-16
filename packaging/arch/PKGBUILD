@@ -1,0 +1,56 @@
+# Maintainer: Joel Ernesto Lopez Verdugo <contacto@joledev.com>
+#
+# Empaqueta JobTracker desde el codigo fuente local, no desde la release de
+# GitHub: la v1.0.0 es anterior a los arreglos de septiembre de 2026 y arrastra
+# la lista de ofertas vacia en modo local y el cambio de etapa sin transaccion.
+#
+# Uso:  cd packaging/arch && makepkg -si
+
+pkgname=jobtracker
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Seguimiento de postulaciones de trabajo (Tauri + React)"
+arch=('x86_64')
+url="https://github.com/joledev/jobtracker"
+license=('MIT')
+# webkit2gtk-4.1 y gtk3 los necesita el binario en tiempo de ejecucion.
+depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator-gtk3' 'librsvg')
+makedepends=('rust' 'cargo' 'pnpm' 'nodejs')
+provides=('jobtracker')
+conflicts=('jobtracker-bin')
+options=('!strip' '!debug')
+
+# Se construye desde el arbol de trabajo, no desde una fuente descargada.
+_srcdir="${startdir}/../.."
+
+build() {
+  cd "${_srcdir}/apps/desktop"
+  pnpm install --frozen-lockfile
+  # Solo el binario: el empaquetado AppImage de Tauri falla en Arch por FUSE y
+  # aqui no hace falta, porque el paquete lo produce makepkg.
+  pnpm tauri build --no-bundle
+}
+
+package() {
+  cd "${_srcdir}/apps/desktop/src-tauri/target/release"
+  install -Dm755 jobtracker-desktop "${pkgdir}/usr/bin/jobtracker"
+
+  install -Dm644 "${_srcdir}/apps/desktop/src-tauri/icons/128x128@2x.png" \
+    "${pkgdir}/usr/share/icons/hicolor/256x256/apps/jobtracker.png"
+
+  install -Dm644 /dev/stdin "${pkgdir}/usr/share/applications/jobtracker.desktop" <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=JobTracker
+Comment=Seguimiento de postulaciones de trabajo
+Exec=/usr/bin/jobtracker
+Icon=jobtracker
+Terminal=false
+Categories=Office;ProjectManagement;
+StartupWMClass=JobTracker
+DESKTOP
+
+  if [ -f "${_srcdir}/LICENSE" ]; then
+    install -Dm644 "${_srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  fi
+}
