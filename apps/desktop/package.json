@@ -24,7 +24,7 @@
 		"@tauri-apps/plugin-sql": "^2.4.1",
 		"@tauri-apps/plugin-store": "^2.4.5",
 		"lucide-react": "^0.577.0",
-		"pdfjs-dist": "^5.7.284",
+		"pdfjs-dist": "^6.2.108",
 		"react": "^19.3.0",
 		"react-dom": "^19.3.0",
 		"react-hook-form": "^7.88.0",
