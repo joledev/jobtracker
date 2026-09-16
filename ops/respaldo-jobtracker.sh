@@ -2,7 +2,7 @@
 # Respaldo de la base de JobTracker (PostgreSQL en Docker Compose) con copia
 # fuera del servidor en Cloudflare R2.
 #
-# JobTracker no corre en K3s, asi que no entra en el CronJob `joledev-db-backup`
+# JobTracker no corre en K3s, asi que no entra en el CronJob de respaldo del cluster
 # del cluster: ese monta PVCs y usa `sqlite3 .backup`. Este script replica su
 # logica sobre `pg_dump` y se instala como cron del host.
 #

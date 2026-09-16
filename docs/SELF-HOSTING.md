@@ -142,6 +142,12 @@ This exposes the API over plain HTTP. Every request carries your API key in
 clear text, so only do this on a network you control, or behind a VPN. For
 anything reachable from the internet, use Option 1.
 
+**Set `TRUST_PROXY=0` in your `.env` for this option.** Requests reach the API
+directly, with no proxy to append the real client address, so any client could
+send its own `X-Forwarded-For` and land in a private rate-limit bucket. With
+`TRUST_PROXY=0` the limiter uses the TCP peer address, which the client cannot
+forge.
+
 ---
 
 ## Option B: Manual setup with Bun

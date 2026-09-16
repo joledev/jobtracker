@@ -29,8 +29,12 @@ services:
       # `docker compose exec api bun run seed` -- the documented quick start --
       # exits with "MASTER_API_KEY environment variable is required".
       MASTER_API_KEY: ${MASTER_API_KEY:?Set MASTER_API_KEY in .env}
-      # Number of reverse proxies in front of the API. The bundled nginx is 1.
-      TRUST_PROXY: ${TRUST_PROXY:-1}
+      # Number of reverse proxies in front of the API. The bundled nginx is 1,
+      # so .env.example ships TRUST_PROXY=1. The default here is 0 on purpose:
+      # trusting X-Forwarded-For when nothing sets it lets any client forge the
+      # header and get its own rate-limit bucket, which is a bypass. Falling back
+      # to 0 only degrades the limiter to a single shared window.
+      TRUST_PROXY: ${TRUST_PROXY:-0}
     ports:
       - "127.0.0.1:3000:3000"
 
