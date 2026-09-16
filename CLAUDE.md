@@ -117,5 +117,4 @@ Skip: simple UI components, basic CRUD without logic.
 - `Architecture.md` — Design decisions, full DB schema, data flows
 - `Agents.md` — API routes, color palette, developer conventions
 - `Todo.md` — Implementation checklist by phase
-- `AUDIT_REPORT.md` — internal audit notes
 - `README.md` — Project overview and stack rationale (Spanish)
