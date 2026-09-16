@@ -96,7 +96,8 @@ timelineRoute.get('/', async (c) => {
 	return c.json({
 		events,
 		stats: {
-			total_offers: totalResult.total,
+			// Un agregado sin GROUP BY siempre trae una fila; sin ella el conteo es cero.
+			total_offers: totalResult?.total ?? 0,
 			by_stage: byStage,
 		},
 	})

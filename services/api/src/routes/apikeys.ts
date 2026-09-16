@@ -66,7 +66,10 @@ apikeysRoute.delete('/:id', async (c) => {
 		.select({ total: count() })
 		.from(apiKeys)
 		.where(isNull(apiKeys.revokedAt))
-	if (Number(activeCount.total) <= 1) {
+	// Un agregado sin GROUP BY siempre trae una fila, pero el tipo del acceso por
+	// indice no lo sabe. Sin fila hay cero claves activas, que es tambien el valor
+	// mas conservador: deja la guarda puesta en vez de saltarsela.
+	if (Number(activeCount?.total ?? 0) <= 1) {
 		return c.json({ error: 'Cannot revoke the last active API key' }, 400)
 	}
 

@@ -50,6 +50,13 @@ cvsRoute.post('/', async (c) => {
 		return c.json({ error: 'Validation failed', issues: result.error.flatten() }, 400)
 	}
 	const [cv] = await db.insert(cvSnapshots).values(result.data).returning()
+	// El `returning()` de un insert de una sola fila siempre la devuelve; si no lo
+	// hace, el insert no ocurrio. No es un 404 —el recurso no existia todavia— asi
+	// que se lanza y responde el onError global con 500, en vez de arrastrar un
+	// `undefined` hasta la consulta siguiente y devolver un 201 con un cuerpo vacio.
+	if (!cv) {
+		throw new Error('Insert into cv_snapshots returned no row')
+	}
 
 	const linkedOffers = await db
 		.select({

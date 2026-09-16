@@ -128,6 +128,20 @@ const stageRows = await db
 
 const stageBySlug = Object.fromEntries(stageRows.map((s) => [s.slug, s.id]))
 
+// Los indices construidos con Object.fromEntries devuelven `string | undefined`:
+// nada garantiza que la fila buscada este en la base. Leerlos directo dejaba que
+// un id ausente viajara como `undefined` hasta el insert, donde drizzle omite la
+// columna: en `offer_technologies.technology_id`, que es NOT NULL, eso revienta
+// con un error de Postgres que no dice que fila falta. Resolver aqui convierte el
+// fallo en un mensaje con nombre y aborta antes de tocar la base.
+function requireId(index: Record<string, string>, key: string, kind: string): string {
+	const id = index[key]
+	if (!id) {
+		throw new Error(`Seed aborted: no ${kind} named '${key}' exists in the database`)
+	}
+	return id
+}
+
 // --- Offers ---
 
 const OFFER_ACME_ID = '00000000-0000-4000-b000-000000000001'
@@ -141,21 +155,21 @@ await db
 			id: OFFER_ACME_ID,
 			company: 'Acme Corp',
 			position: 'Backend Engineer',
-			currentStageId: stageBySlug.applied,
+			currentStageId: requireId(stageBySlug, 'applied', 'pipeline stage'),
 			workspaceId: WS_BACKEND_ID,
 		},
 		{
 			id: OFFER_TECHSTARTUP_ID,
 			company: 'TechStartup',
 			position: 'Senior Backend Engineer',
-			currentStageId: stageBySlug.screening,
+			currentStageId: requireId(stageBySlug, 'screening', 'pipeline stage'),
 			workspaceId: WS_BACKEND_ID,
 		},
 		{
 			id: OFFER_BIGCO_ID,
 			company: 'BigCo',
 			position: 'Software Architect',
-			currentStageId: stageBySlug['technical-interview'],
+			currentStageId: requireId(stageBySlug, 'technical-interview', 'pipeline stage'),
 			workspaceId: WS_ARCHITECT_ID,
 		},
 	])
@@ -174,12 +188,24 @@ const techByName = Object.fromEntries(techRows.map((t) => [t.name, t.id]))
 await db
 	.insert(offerTechnologies)
 	.values([
-		{ offerId: OFFER_ACME_ID, technologyId: techByName.TypeScript, context: 'required' },
-		{ offerId: OFFER_ACME_ID, technologyId: techByName.PostgreSQL, context: 'required' },
-		{ offerId: OFFER_TECHSTARTUP_ID, technologyId: techByName.TypeScript, context: 'required' },
+		{
+			offerId: OFFER_ACME_ID,
+			technologyId: requireId(techByName, 'TypeScript', 'technology'),
+			context: 'required',
+		},
+		{
+			offerId: OFFER_ACME_ID,
+			technologyId: requireId(techByName, 'PostgreSQL', 'technology'),
+			context: 'required',
+		},
+		{
+			offerId: OFFER_TECHSTARTUP_ID,
+			technologyId: requireId(techByName, 'TypeScript', 'technology'),
+			context: 'required',
+		},
 		{
 			offerId: OFFER_BIGCO_ID,
-			technologyId: techByName.PostgreSQL,
+			technologyId: requireId(techByName, 'PostgreSQL', 'technology'),
 			context: 'asked-in-interview',
 		},
 	])

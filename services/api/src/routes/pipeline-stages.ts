@@ -54,9 +54,11 @@ pipelineStagesRoute.delete('/:id', async (c) => {
 		.from(offers)
 		.where(and(eq(offers.currentStageId, id), isNull(offers.deletedAt)))
 
-	if (Number(usage.activeOffers) > 0) {
+	// Un agregado sin GROUP BY siempre trae una fila; sin ella el conteo es cero.
+	const activeOffers = Number(usage?.activeOffers ?? 0)
+	if (activeOffers > 0) {
 		return c.json(
-			{ error: `Cannot delete: ${usage.activeOffers} active offer(s) reference this stage` },
+			{ error: `Cannot delete: ${activeOffers} active offer(s) reference this stage` },
 			409,
 		)
 	}

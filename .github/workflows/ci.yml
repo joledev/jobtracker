@@ -61,7 +61,7 @@ jobs:
         run: pnpm build
 
   api:
-    name: API (check, build)
+    name: API (check, typecheck, build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -78,6 +78,12 @@ jobs:
 
       - name: Biome check
         run: bun run check
+
+      # Biome no comprueba tipos y `bun build` transpila sin verificarlos: entre
+      # los dos pasos anteriores cabian diez errores de TypeScript en verde. Este
+      # paso corre `tsc --noEmit`, que es el unico que los ve.
+      - name: Typecheck
+        run: bun run typecheck
 
       - name: Build
         run: bun run build

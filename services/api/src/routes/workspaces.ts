@@ -71,7 +71,8 @@ workspacesRoute.delete('/:id', async (c) => {
 		.from(offers)
 		.where(and(eq(offers.workspaceId, id), isNull(offers.deletedAt)))
 
-	const total = Number(offerCount.total)
+	// Un agregado sin GROUP BY siempre trae una fila; sin ella el conteo es cero.
+	const total = Number(offerCount?.total ?? 0)
 
 	if (total > 0 && !action) {
 		return c.json(
