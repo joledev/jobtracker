@@ -20,6 +20,9 @@ import type {
   Contact,
   ContactFilters,
   PhoneCall,
+  Communication,
+  CreateCommunicationInput,
+  UpdateCommunicationInput,
   CreateCallInput,
   InterviewQuestion,
   CreateQuestionInput,
@@ -149,6 +152,18 @@ export async function initLocalDb(): Promise<void> {
     updated_at TEXT NOT NULL
   )`)
 
+  await db.execute(`CREATE TABLE IF NOT EXISTS communications (
+    id TEXT PRIMARY KEY,
+    offer_id TEXT NOT NULL REFERENCES offers(id),
+    contact_id TEXT REFERENCES contacts(id),
+    channel TEXT NOT NULL DEFAULT 'email',
+    direction TEXT NOT NULL DEFAULT 'inbound',
+    subject TEXT,
+    body TEXT,
+    occurred_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`)
+
   await db.execute(`CREATE TABLE IF NOT EXISTS technologies (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
@@ -219,6 +234,21 @@ function getDb(): Database {
 }
 
 // Helper to map SQLite rows (snake_case) to camelCase
+function mapCommunication(r: Record<string, unknown>) {
+  return {
+    id: r.id as string,
+    offerId: r.offer_id as string,
+    contactId: r.contact_id as string | null,
+    channel: r.channel as Communication['channel'],
+    direction: r.direction as Communication['direction'],
+    subject: r.subject as string | null,
+    body: r.body as string | null,
+    occurredAt: r.occurred_at as string,
+    contactName: (r.contact_name ?? null) as string | null,
+    createdAt: r.created_at as string,
+  }
+}
+
 function rowToOffer(r: Record<string, unknown>): OfferListItem {
   return {
     id: r.id as string,
@@ -505,6 +535,71 @@ export function createLocalClient(): ApiClient {
           notes: r.notes as string | null, callType: r.call_type as string,
           createdAt: r.created_at as string, updatedAt: r.updated_at as string,
         } as PhoneCall
+      },
+
+      listCommunications: async (offerId: string) => {
+        const d = getDb()
+        const rows = await d.select<Record<string, unknown>[]>(
+          `SELECT cm.*, c.name as contact_name FROM communications cm
+           LEFT JOIN contacts c ON cm.contact_id = c.id
+           WHERE cm.offer_id = $1 ORDER BY cm.occurred_at DESC`, [offerId],
+        )
+        return rows.map(mapCommunication) as Communication[]
+      },
+
+      addCommunication: async (offerId: string, data: CreateCommunicationInput) => {
+        const d = getDb()
+        const id = uuid()
+        await d.execute(
+          `INSERT INTO communications (id, offer_id, contact_id, channel, direction, subject, body, occurred_at, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [id, offerId, data.contactId ?? null, data.channel ?? 'email', data.direction ?? 'inbound',
+            data.subject ?? null, data.body ?? null, data.occurredAt, now()],
+        )
+        const rows = await d.select<Record<string, unknown>[]>('SELECT * FROM communications WHERE id = $1', [id])
+        const r = rows[0]
+        if (!r) throw new Error('Insert into communications returned no row')
+        return mapCommunication(r) as Communication
+      },
+
+      updateCommunication: async (offerId: string, commId: string, data: UpdateCommunicationInput) => {
+        const d = getDb()
+        // Solo se tocan los campos presentes: una actualizacion parcial no debe
+        // borrar el resto poniendolos a null.
+        const campos: string[] = []
+        const valores: unknown[] = []
+        const mapa: Array<[keyof UpdateCommunicationInput, string]> = [
+          ['contactId', 'contact_id'], ['channel', 'channel'], ['direction', 'direction'],
+          ['subject', 'subject'], ['body', 'body'], ['occurredAt', 'occurred_at'],
+        ]
+        for (const [clave, columna] of mapa) {
+          if (data[clave] !== undefined) {
+            campos.push(`${columna} = $${campos.length + 1}`)
+            valores.push(data[clave])
+          }
+        }
+        if (campos.length === 0) throw new ApiClientError(400, 'At least one field must be provided')
+
+        // offer_id va en el WHERE: sin el, un commId de otra oferta se
+        // actualizaria desde una pantalla que dice pertenecer a esta.
+        valores.push(commId, offerId)
+        await d.execute(
+          `UPDATE communications SET ${campos.join(', ')} WHERE id = $${valores.length - 1} AND offer_id = $${valores.length}`,
+          valores,
+        )
+        const rows = await d.select<Record<string, unknown>[]>(
+          'SELECT * FROM communications WHERE id = $1 AND offer_id = $2', [commId, offerId])
+        const r = rows[0]
+        if (!r) throw new ApiClientError(404, 'Communication not found')
+        return mapCommunication(r) as Communication
+      },
+
+      deleteCommunication: async (offerId: string, commId: string) => {
+        const d = getDb()
+        const rows = await d.select<Record<string, unknown>[]>(
+          'SELECT id FROM communications WHERE id = $1 AND offer_id = $2', [commId, offerId])
+        if (!rows[0]) throw new ApiClientError(404, 'Communication not found')
+        await d.execute('DELETE FROM communications WHERE id = $1 AND offer_id = $2', [commId, offerId])
       },
 
       listQuestions: async (offerId: string) => {

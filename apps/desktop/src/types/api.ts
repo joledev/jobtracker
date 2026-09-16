@@ -141,6 +141,24 @@ export interface Contact {
 
 // Phone Calls
 
+export type CommunicationChannel = 'email' | 'linkedin' | 'whatsapp' | 'other'
+export type CommunicationDirection = 'inbound' | 'outbound'
+
+/** Correo, mensaje de LinkedIn o WhatsApp. Las llamadas van en PhoneCall:
+ *  tienen duracion y numero, y no conviene el mismo evento en dos tablas. */
+export interface Communication {
+  id: string
+  offerId: string
+  contactId: string | null
+  channel: CommunicationChannel
+  direction: CommunicationDirection
+  subject: string | null
+  body: string | null
+  occurredAt: string
+  contactName?: string | null
+  createdAt: string
+}
+
 export interface PhoneCall {
   id: string
   offerId: string
@@ -279,6 +297,17 @@ export interface CreateContactInput {
   company?: string
   role?: string
 }
+
+export interface CreateCommunicationInput {
+  contactId?: string
+  channel?: CommunicationChannel
+  direction?: CommunicationDirection
+  subject?: string
+  body?: string
+  occurredAt: string
+}
+
+export type UpdateCommunicationInput = Partial<CreateCommunicationInput>
 
 export interface CreateCallInput {
   phoneNumber?: string

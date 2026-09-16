@@ -15,6 +15,7 @@ import { GeneralTab } from '@/components/offers/detail/GeneralTab'
 import { HistoryTab } from '@/components/offers/detail/HistoryTab'
 import { ContactsTab } from '@/components/offers/detail/ContactsTab'
 import { CallsTab } from '@/components/offers/detail/CallsTab'
+import { CommunicationsTab } from '@/components/offers/detail/CommunicationsTab'
 import { TechnologiesTab } from '@/components/offers/detail/TechnologiesTab'
 import { QuestionsTab } from '@/components/offers/detail/QuestionsTab'
 import { RemindersTab } from '@/components/offers/detail/RemindersTab'
@@ -26,6 +27,7 @@ const tabs = [
   { key: 'history', label: 'Historial' },
   { key: 'contacts', label: 'Contactos' },
   { key: 'calls', label: 'Llamadas' },
+  { key: 'communications', label: 'Comunicaciones' },
   { key: 'technologies', label: 'Tecnologias' },
   { key: 'questions', label: 'Preguntas' },
   { key: 'reminders', label: 'Recordatorios' },
@@ -201,6 +203,7 @@ export const OfferDetailPage = () => {
         {activeTab === 'history' && <HistoryTab offer={offer} />}
         {activeTab === 'contacts' && <ContactsTab offer={offer} onRefresh={loadOffer} />}
         {activeTab === 'calls' && <CallsTab offerId={offer.id} />}
+        {activeTab === 'communications' && <CommunicationsTab offerId={offer.id} />}
         {activeTab === 'technologies' && <TechnologiesTab offer={offer} onRefresh={loadOffer} />}
         {activeTab === 'questions' && <QuestionsTab offerId={offer.id} />}
         {activeTab === 'reminders' && <RemindersTab offerId={offer.id} />}

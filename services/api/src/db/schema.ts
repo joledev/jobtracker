@@ -126,6 +126,25 @@ export const phoneCalls = pgTable('phone_calls', {
 	callType: text('call_type').default('inbound'),
 })
 
+// Communications — email, LinkedIn and anything else that is not a phone call.
+// Calls keep their own table because they carry duration and a phone number;
+// splitting them here would mean the same event living in two places.
+export const communications = pgTable('communications', {
+	id: uuid('id').defaultRandom().primaryKey(),
+	offerId: uuid('offer_id')
+		.notNull()
+		.references(() => offers.id),
+	contactId: uuid('contact_id').references(() => contacts.id),
+	// 'email' | 'linkedin' | 'whatsapp' | 'other'
+	channel: text('channel').notNull().default('email'),
+	// 'inbound' (they wrote) | 'outbound' (you wrote)
+	direction: text('direction').notNull().default('inbound'),
+	subject: text('subject'),
+	body: text('body'),
+	occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 // Technologies — tech stack catalog
 export const technologies = pgTable('technologies', {
 	id: uuid('id').defaultRandom().primaryKey(),

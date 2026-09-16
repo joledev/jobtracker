@@ -101,6 +101,35 @@ export const createCallSchema = z.object({
 	callType: z.string().default('inbound'),
 })
 
+// --- Communications ---
+
+const CANALES = ['email', 'linkedin', 'whatsapp', 'other'] as const
+const DIRECCIONES = ['inbound', 'outbound'] as const
+
+export const createCommunicationSchema = z.object({
+	contactId: z.string().uuid().optional(),
+	channel: z.enum(CANALES).default('email'),
+	direction: z.enum(DIRECCIONES).default('inbound'),
+	subject: z.string().max(500).optional(),
+	body: z.string().optional(),
+	occurredAt: z.string().datetime(),
+})
+
+// Todos opcionales, pero al menos uno: un PUT vacio no debe pasar la validacion
+// y dejar el registro intacto fingiendo que actualizo algo.
+export const updateCommunicationSchema = z
+	.object({
+		contactId: z.string().uuid().nullable().optional(),
+		channel: z.enum(CANALES).optional(),
+		direction: z.enum(DIRECCIONES).optional(),
+		subject: z.string().max(500).nullable().optional(),
+		body: z.string().nullable().optional(),
+		occurredAt: z.string().datetime().optional(),
+	})
+	.refine((v) => Object.keys(v).length > 0, {
+		message: 'At least one field must be provided',
+	})
+
 // --- Technologies ---
 
 export const createTechnologySchema = z.object({
@@ -211,6 +240,8 @@ export type UpdateContactInput = z.infer<typeof updateContactSchema>
 export type ListContactsQuery = z.infer<typeof listContactsQuerySchema>
 export type LinkOfferContactInput = z.infer<typeof linkOfferContactSchema>
 export type CreateCallInput = z.infer<typeof createCallSchema>
+export type CreateCommunicationInput = z.infer<typeof createCommunicationSchema>
+export type UpdateCommunicationInput = z.infer<typeof updateCommunicationSchema>
 export type CreateTechnologyInput = z.infer<typeof createTechnologySchema>
 export type ListTechnologiesQuery = z.infer<typeof listTechnologiesQuerySchema>
 export type LinkOfferTechnologyInput = z.infer<typeof linkOfferTechnologySchema>

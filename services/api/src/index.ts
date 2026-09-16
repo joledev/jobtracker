@@ -6,6 +6,7 @@ import { authMiddleware } from './middleware/auth'
 import { rateLimit } from './middleware/rate-limit'
 import { apikeysRoute } from './routes/apikeys'
 import { callsRoute } from './routes/calls'
+import { communicationsRoute } from './routes/communications'
 import { contactsRoute, offerContactsRoute } from './routes/contacts'
 import { cvsRoute } from './routes/cvs'
 import { healthRoute } from './routes/health'
@@ -48,6 +49,7 @@ app.route('/api/workspaces', workspacesRoute)
 app.route('/api/contacts', contactsRoute)
 app.route('/api/offers', offerContactsRoute)
 app.route('/api/offers', callsRoute)
+app.route('/api/offers', communicationsRoute)
 app.route('/api/technologies', technologiesRoute)
 app.route('/api/offers', offerTechnologiesRoute)
 app.route('/api/offers', questionsRoute)

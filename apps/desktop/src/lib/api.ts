@@ -21,6 +21,9 @@ import type {
   ContactFilters,
   CreateContactInput,
   PhoneCall,
+  Communication,
+  CreateCommunicationInput,
+  UpdateCommunicationInput,
   CreateCallInput,
   InterviewQuestion,
   CreateQuestionInput,
@@ -180,6 +183,28 @@ export const createApiClient = (baseUrl: string, apiKey: string) => ({
       createRequest<PhoneCall>(baseUrl, apiKey, `/api/offers/${offerId}/calls`, {
         method: 'POST',
         body: JSON.stringify(data),
+      }),
+
+    listCommunications: (offerId: string) =>
+      createRequest<Communication[]>(baseUrl, apiKey, `/api/offers/${offerId}/communications`),
+
+    addCommunication: (offerId: string, data: CreateCommunicationInput) =>
+      createRequest<Communication>(baseUrl, apiKey, `/api/offers/${offerId}/communications`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateCommunication: (offerId: string, commId: string, data: UpdateCommunicationInput) =>
+      createRequest<Communication>(
+        baseUrl,
+        apiKey,
+        `/api/offers/${offerId}/communications/${commId}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+      ),
+
+    deleteCommunication: (offerId: string, commId: string) =>
+      createRequest<void>(baseUrl, apiKey, `/api/offers/${offerId}/communications/${commId}`, {
+        method: 'DELETE',
       }),
 
     listQuestions: (offerId: string) =>
