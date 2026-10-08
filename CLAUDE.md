@@ -1,120 +1,49 @@
-# CLAUDE.md
+# jobtracker
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+App de escritorio de un solo usuario para seguir postulaciones de empleo (Tauri 2 + React 19 + TypeScript) con dos modos: SQLite local o una API Hono + Bun + Drizzle sobre PostgreSQL 16 autoalojada. Sin lógica de IA: todo es determinista. Repo público en GitHub (cuenta joledev) desde 2026-09-16; versión 1.1.0.
 
-## Project Overview
+## Comandos (verificados 2026-10-08)
+- Escritorio, desde `apps/desktop/`: `cd apps/desktop && pnpm install --frozen-lockfile`, luego pnpm run lint, pnpm run test:run (vitest), pnpm run build (`tsc -b && vite build`), pnpm run tauri dev y pnpm run tauri build.
+- API, desde `services/api/`: bun install, bun run dev (hot reload), bun run check (Biome), bun run typecheck (`tsc --noEmit`), bun run build, bun run check:fix (Biome con --write), bun run db:generate, bun run db:migrate, bun run db:studio (drizzle-kit studio), bun run seed.
+- Self-hosting: en `services/api/` copiar `.env.example` a `.env`, `docker compose up -d --build`, luego `docker compose exec api bun run db:migrate` y el seed. Guía completa en `docs/SELF-HOSTING.md`.
+- CI (`.github/workflows/ci.yml`, push y PR a main): escritorio (lint, tests, build), API (check, typecheck, build) y un job que levanta el compose, aplica todas las migraciones y llama a la API.
+- Release: tag `v*` dispara `.github/workflows/release.yml` (release en draft, binarios Windows, macOS y Linux). Paquete Arch en `packaging/arch/` con makepkg.
 
-JobTracker is a privacy-first desktop app for tracking job applications, backed by a self-hosted Hono API on a personal VPS. Single-user, no AI logic, purely deterministic. Author: Joel, Software Architect (TypeScript, Rust, Flutter, Go).
+## Mapa
+- `services/api/src/index.ts`: app Hono, CORS (`CORS_ORIGIN`), cabeceras seguras, montaje de rutas.
+- `services/api/src/routes/`: una ruta por archivo; `schemas.ts` son los Zod compartidos; `offer-contacts` y `offer-technologies` salen de `contacts.ts` y `technologies.ts`.
+- `services/api/src/middleware/`: `auth.ts` (API key) y `rate-limit.ts`.
+- `services/api/src/db/schema.ts` y `services/api/drizzle/`: esquema Drizzle y migraciones SQL 0000 a 0002.
+- `apps/desktop/src/lib/api.ts` y `apps/desktop/src/lib/local-db.ts`: los dos clientes que implementan la misma interfaz `ApiClient`.
+- `apps/desktop/src/stores/`: Zustand, un store por dominio.
+- `apps/desktop/src/lib/parsers/` y `apps/desktop/src/lib/html-extractor/`: importadores de ofertas; ahí viven todas las pruebas.
+- `apps/desktop/src-tauri/src/commands.rs` y `lib.rs`: tres comandos (LaTeX y guardar PDF) y el registro en `generate_handler!`.
+- `ops/respaldo-jobtracker.sh`: respaldo `pg_dump` a R2, escrito y sin instalar.
 
-**Guiding principle:** Minimal code, maximum result. No premature abstractions, no classes where functions suffice, no dependencies without justification.
+## Invariantes y trampas
+- Auth: API keys con hash SHA-256 en la cabecera `X-API-Key`; sin JWT ni login. El seed crea la primera clave desde `MASTER_API_KEY`; sin seed todo responde 401.
+- Toda funcionalidad va en los dos modos: tabla y migración Drizzle más ruta para el remoto, y la misma operación en `local-db.ts` para SQLite. Olvidar uno deja la pantalla vacía en ese modo.
+- `tauri://localhost` debe estar en `CORS_ORIGIN`: sin él la app ve una lista vacía y el servidor no registra error (commit `d05a429`, 2026-09-16). En Tauri 2 no hay `allowlist`.
+- Un comando Tauri nuevo se registra en `generate_handler!` de `lib.rs` y sus permisos en `src-tauri/capabilities/default.json`, no en `tauri.conf.json`.
+- `TRUST_PROXY` vale 0 sin proxy delante; con 1 y sin proxy el rate limiter se puentea con `X-Forwarded-For` (2026-09-16).
+- Tras cambiar el esquema: bun run db:generate y aplicar todas las migraciones; aplicar solo la 0000 rompe las rutas de CVs.
+- Soft delete (`deleted_at`) solo en `workspaces`, `cv_snapshots`, `offers` y `reminders`; el resto borra de verdad.
+- `phone_calls` es la única fuente de llamadas; `communications` (correo, LinkedIn, WhatsApp) no admite el canal teléfono (2026-09-16).
+- En update y delete de hijos de una oferta, `offer_id` va en el WHERE, no solo en la URL.
+- La compilación LaTeX corre aislada con bubblewrap en Linux; `--no-shell-escape` no impide leer archivos.
+- Las acciones de GitHub van pineadas por SHA con su versión en comentario.
+- Validación Zod en cada endpoint; Biome en la API prohíbe `any`.
 
-**Status:** Phase 0 (infrastructure) and Phase 1 (MVP) are complete. Phase 3 (CV Manager, offer import, offline mode) is implemented. Phase 2 (Flutter companion) and Phase 4 (server management) are planned but not started. See `Todo.md` for the full checklist.
+## Flujo de trabajo
+- Rama `main`; los cambios grandes pasaron por PR (#1, 2026-09-15) y el CI de tres jobs debe quedar en verde. Antes de commitear: lint, test:run y build del escritorio; check, typecheck y build de la API.
 
-## Monorepo Structure
+## Qué no hacer
+- No añadir lógica de IA ni dependencias sin justificarlas.
+- No escribir credenciales, rutas del servidor ni usuarios reales: el repo es público y su historial ya se purgó una vez (2026-09-16).
+- No acceder a la base sin Drizzle salvo en migraciones.
+- No usar `docs/internal/Todo.md` como estado: ningún ítem está marcado.
 
-- `services/api/` — Hono + Bun backend, Drizzle ORM + PostgreSQL 16
-- `apps/desktop/` — Tauri v2 (Rust + React 19 + TypeScript + Vite)
-- `apps/mobile/` — Flutter companion (not yet created)
-
-## Commands
-
-### API (`services/api/`)
-```bash
-bun install                  # install deps
-bun run dev                  # dev server with hot reload (--hot)
-bun run build                # production build
-bun run db:generate          # generate Drizzle migrations after schema changes
-bun run db:migrate           # apply migrations
-bun run db:studio            # Drizzle Studio (DB UI)
-bun run seed                 # seed database
-bun run check                # biome lint + format check
-bun run check:fix            # biome auto-fix
-docker compose up -d         # deploy on VPS (PostgreSQL + API + Nginx)
-```
-
-### Desktop (`apps/desktop/`)
-```bash
-pnpm install
-pnpm tauri dev               # dev mode (Vite + Tauri)
-pnpm tauri build             # native binary
-pnpm test                    # vitest watch mode
-pnpm test:run                # vitest single run (all tests)
-pnpm lint                    # eslint
-```
-
-## Architecture
-
-```
-Desktop (Tauri) ──HTTPS + X-API-Key──→ Hono API (Bun) ──Drizzle──→ PostgreSQL 16
-       └──── SQLite (offline mode, same ApiClient interface) ──┘
-```
-
-- **Auth:** API keys hashed with SHA-256, sent as `X-API-Key` header. No JWT, no login.
-- **Dual-mode storage:** Desktop can use remote API (PostgreSQL) or local SQLite — both implement the same `ApiClient` interface (`src/lib/api.ts` vs `src/lib/local-db.ts`).
-- **Validation:** Zod schemas on all API endpoints and React forms.
-- **ORM:** Drizzle (SQL-first, type-safe). Migrations are real SQL files in `services/api/drizzle/`.
-- **Desktop state:** Zustand — one store per domain (`offers`, `cvs`, `pipeline`, `connection`, `ui`, `templates`).
-- **Desktop config:** `tauri-plugin-store` persists VPS URL, API key, active workspace.
-
-### API route structure
-13 route files in `services/api/src/routes/`: `offers`, `workspaces`, `pipeline-stages`, `contacts`, `calls`, `technologies`, `questions`, `reminders`, `cvs`, `apikeys`, `timeline`, `health`, plus `schemas` (shared zod definitions, not a route). Note that `offer-contacts` and `offer-technologies` are exports of `contacts.ts` and `technologies.ts`, not files of their own.
-
-### Desktop component organization
-- `components/ui/` — atoms (Button, Input, Modal, Select, etc.)
-- `components/[feature]/` — feature organisms (offers/, cv/, settings/, layout/)
-- `pages/` — 5 pages: Offers, OfferDetail, CV, Timeline, Settings
-- `lib/parsers/` — job board importers (LinkedIn, Indeed, Computrabajo, OCC, generic)
-- `lib/html-extractor/` — CSS selector learning for offer import
-
-### Tauri Rust layer
-Minimal — 3 commands in `src-tauri/src/commands.rs`: `check_latex_installed`, `compile_latex` (pdflatex → base64 PDF), `save_pdf_to_disk`. No business logic in Rust.
-
-## Database
-
-Core entities: `offers` (central), `workspaces`, `pipeline_stages`, `offer_status_log`, `contacts`, `offer_contacts`, `phone_calls`, `technologies`, `offer_technologies`, `interview_questions`, `cv_snapshots`, `api_keys`.
-
-All tables: UUID PKs, `created_at`/`updated_at` timestamps, soft deletes via `deleted_at`. Schema in `services/api/src/db/schema.ts`. Full design in `Architecture.md`.
-
-## Code Conventions
-
-### TypeScript (API + Desktop)
-- Strict mode, single quotes, no semicolons, tabs (Biome for API, ESLint for desktop)
-- Functional patterns — no classes, no `any`
-- Zod for all input validation, Drizzle for all DB access (never raw SQL except migrations)
-
-### Hard rules
-1. **Never** add AI/ML logic — everything is deterministic
-2. **Never** hardcode credentials — always config files or env vars
-3. **Never** add dependencies without justification
-4. **Always** run `bun run db:generate` after modifying the Drizzle schema
-5. **Always** add Zod schemas for each new endpoint
-6. Register new Tauri commands in `tauri.conf.json`
-7. When modifying status palette: update both DB defaults and CSS variables
-
-### Feature implementation workflow
-1. Create/update Drizzle schema if needed
-2. Generate migration: `bun run db:generate`
-3. Create Hono route with Zod validation
-4. Update the API client in `src/lib/api.ts` (and `local-db.ts` if offline mode needs it)
-5. Create/update Zustand store
-6. Implement UI component
-7. Integrate in page
-
-### Testing priorities
-Test: auth middleware, data transformations, workspace filters, timeline calculations, parsers.
-Skip: simple UI components, basic CRUD without logic.
-
-## Common Errors
-
-| Error | Fix |
-|---|---|
-| CORS error in desktop | Add VPS URL to `tauri.conf.json` → `allowlist.http.scope` |
-| `relation does not exist` | Run `bun run db:migrate` |
-| `401 Unauthorized` | Rotate API key from Settings |
-
-## Key Documentation
-
-- `Architecture.md` — Design decisions, full DB schema, data flows
-- `Agents.md` — API routes, color palette, developer conventions
-- `Todo.md` — Implementation checklist by phase
-- `README.md` — Project overview and stack rationale (Spanish)
+## Dónde está lo demás
+- Pendientes: `$SECOND_BRAIN/Bitacora/NEXT/jobtracker.md`.
+- Contexto movido de este archivo: `$SECOND_BRAIN/projects/jobtracker/handoff-2026-10-08-contexto-movido-del-claude-md.md`.
+- Diseño y rutas: `Architecture.md`, `Agents.md`, `README.md` del repo.
